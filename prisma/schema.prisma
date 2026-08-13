@@ -7,80 +7,147 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum RolUsuario {
-  ADMIN
-  OPERADOR
+enum EstadoProducto {
+  ACTIVO
+  INACTIVO
+  AGOTADO
+}
+
+enum EstadoTransmision {
+  PROGRAMADA
+  EN_VIVO
+  FINALIZADA
+  CANCELADA
 }
 
 enum EstadoPedido {
+  PENDIENTE
+  EN_REVISION
+  PAGADO
+  RECHAZADO
+  ENTREGADO
+  CANCELADO
+}
+
+enum EstadoMensaje {
+  ENVIADO
+  ENTREGADO
+  LEIDO
+  FALLIDO
+}
+
+enum EstadoComprobante {
   PENDIENTE
   VALIDADO
   RECHAZADO
 }
 
-model Usuario {
-  id        String     @id @default(uuid())
-  nombre    String
-  email     String     @unique
-  password  String
-  rol       RolUsuario @default(OPERADOR)
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
+enum TipoMovimiento {
+  ENTRADA
+  SALIDA
+  AJUSTE
+}
 
-  @@map("usuarios")
+enum EstadoGeneral {
+  ACTIVO
+  INACTIVO
+}
+
+model Categoria {
+  idCategoria     Int           @id @default(autoincrement())
+  nombreCategoria String        @db.VarChar(100)
+  estado          EstadoGeneral @default(ACTIVO)
+  productos       Producto[]
 }
 
 model Producto {
-  id          String    @id @default(uuid())
-  nombre      String
-  descripcion String?
-  precio      Decimal   @db.Decimal(10, 2)
-  stock       Int       @default(0)
-  imagenUrl   String?
-  activo      Boolean   @default(true)
-  pedidos     Pedido[]
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  idProducto     Int             @id @default(autoincrement())
+  nombreProducto String          @db.VarChar(150)
+  precio         Decimal         @db.Decimal(10, 2)
+  stock          Int             @default(0)
+  descripcion    String?         @db.Text
+  estado         EstadoProducto  @default(ACTIVO)
+  urlImagen      String?         @db.VarChar(255)
+  idCategoria    Int
+  categoria      Categoria       @relation(fields: [idCategoria], references: [idCategoria])
+  detallesPedido DetallePedido[]
+  historiales    Historial[]
+}
 
-  @@map("productos")
+model Historial {
+  idHistorial    Int            @id @default(autoincrement())
+  cantidad       Int
+  fecha          DateTime       @default(now())
+  tipoMovimiento TipoMovimiento
+  idProducto     Int
+  producto       Producto       @relation(fields: [idProducto], references: [idProducto])
+}
+
+model Administrador {
+  idAdministrador Int           @id @default(autoincrement())
+  usuario         String        @unique @db.VarChar(50)
+  clave           String        @db.VarChar(255)
+  estado          EstadoGeneral @default(ACTIVO)
+  transmisiones   Transmision[]
+}
+
+model Transmision {
+  idTransmision   Int               @id @default(autoincrement())
+  fechaInicio     DateTime
+  fechaFin        DateTime?
+  titulo          String            @db.VarChar(150)
+  estado          EstadoTransmision @default(PROGRAMADA)
+  idAdministrador Int
+  administrador   Administrador     @relation(fields: [idAdministrador], references: [idAdministrador])
+  pedidos         Pedido[]
+}
+
+model Comprador {
+  idComprador   Int      @id @default(autoincrement())
+  usuarioTiktok String?  @db.VarChar(50)
+  whatsapp      String   @db.VarChar(20)
+  nombreCliente String   @db.VarChar(100)
+  fechaRegistro DateTime @default(now())
+  pedidos       Pedido[]
 }
 
 model Pedido {
-  id             String        @id @default(uuid())
-  usuarioTiktok  String
-  codigoPedido   String        @unique
-  producto       Producto      @relation(fields: [productoId], references: [id])
-  productoId     String
-  cantidad       Int           @default(1)
-  total          Decimal       @db.Decimal(10, 2)
-  estado         EstadoPedido  @default(PENDIENTE)
-  comprobante    Comprobante?
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  idPedido      Int          @id @default(autoincrement())
+  precioTotal   Decimal      @db.Decimal(10, 2)
+  estado        EstadoPedido @default(PENDIENTE)
+  idComprador   Int
+  comprador     Comprador    @relation(fields: [idComprador], references: [idComprador])
+  idTransmision Int
+  transmision   Transmision  @relation(fields: [idTransmision], references: [idTransmision])
 
-  @@map("pedidos")
+  detallesPedido DetallePedido[]
+  mensajes       Mensaje[]
+  comprobante    Comprobante?
+}
+
+model DetallePedido {
+  idDetallePedido Int      @id @default(autoincrement())
+  cantidad        Int
+  precioUnitario  Decimal  @db.Decimal(10, 2)
+  idProducto      Int
+  producto        Producto @relation(fields: [idProducto], references: [idProducto])
+  idPedido        Int
+  pedido          Pedido   @relation(fields: [idPedido], references: [idPedido])
+}
+
+model Mensaje {
+  idMensaje Int           @id @default(autoincrement())
+  contenido String        @db.Text
+  estado    EstadoMensaje @default(ENVIADO)
+  idPedido  Int
+  pedido    Pedido        @relation(fields: [idPedido], references: [idPedido])
 }
 
 model Comprobante {
-  id                String   @id @default(uuid())
-  pedido            Pedido   @relation(fields: [pedidoId], references: [id])
-  pedidoId          String   @unique
-  imagenUrl         String
-  ocrTexto          String?
-  montoDetectado    Decimal? @db.Decimal(10, 2)
-  fechaDetectada    DateTime?
-  referenciaBancaria String?
-  verificadoBnb     Boolean  @default(false)
-  createdAt         DateTime @default(now())
-
-  @@map("comprobantes")
-}
-
-model LiveSession {
-  id          String   @id @default(uuid())
-  tiktokRoomId String
-  iniciadoEn  DateTime @default(now())
-  finalizadoEn DateTime?
-
-  @@map("live_sessions")
+  idComprobante   Int               @id @default(autoincrement())
+  imagenUrl       String            @db.VarChar(255)
+  montoExtraido   Decimal?          @db.Decimal(10, 2)
+  estadoValidacion EstadoComprobante @default(PENDIENTE)
+  idPedido        Int               @unique
+  pedido          Pedido            @relation(fields: [idPedido], references: [idPedido])
 }

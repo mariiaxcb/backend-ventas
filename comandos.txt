@@ -1,0 +1,2 @@
+#Create database based on prisma/schema.prisma
+npm run prisma:migrate
