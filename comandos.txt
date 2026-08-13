@@ -1,2 +1,52 @@
-#Create database based on prisma/schema.prisma
+# Create database based on prisma/schema.prisma
+npm run prisma:migrate
+
+# ==========================================
+# GUÍA DE TRABAJO EN GIT (Flujo por Ramas)
+# ==========================================
+
+# 1. Crear y cambiar a una nueva rama de característica (feature)
+git checkout -b feat/database-migration
+
+# 2. Preparar todos los cambios (archivos creados, modificados o eliminados)
+git add .
+
+# 3. Guardar los cambios con un mensaje bajo la convención Conventional Commits
+git commit -m "feat: Creation of database script."
+
+# 4. Subir la nueva rama al repositorio remoto
+git push -u origin feat/database-migration
+
+# 5. Volver a la rama principal
+git checkout main
+
+  # -----------------------------------------------------------------------------------
+  # NOTA / SOLUCIÓN A ERROR EN WINDOWS:
+  # Si al hacer "git checkout main" sale el error:
+  # "Deletion of directory 'prisma/migrations/...' failed. Should I try again? (y/n)"
+  #
+  # Causa: Prisma Studio, nodemon o el servidor Node tienen bloqueada la carpeta /migrations.
+  # Solución:
+  # 1. Presionar 'n' y Enter para cancelar.
+  # 2. Detener Prisma Studio (Ctrl + C) y/o el servidor ("npm run dev").
+  # 3. Volver a ejecutar: git checkout main
+  # 4. Si vuelve a preguntar, presionar 'y' y Enter para confirmar.
+  # -----------------------------------------------------------------------------------
+
+# 6. Unir los cambios de la rama feature a main (Merge)
+git merge feat/database-migration
+
+# 7. Subir la rama main actualizada al repositorio remoto (para que el colaborador los reciba)
+git push origin main
+
+
+# ==========================================
+# GUÍA PARA EL COLABORADOR
+# ==========================================
+
+# Para que el colaborador obtenga las nuevas migraciones y la rama actualizada:
+git checkout main
+git pull origin main
+
+# Aplicar las migraciones descargadas en su base de datos local y generar el cliente de Prisma:
 npm run prisma:migrate

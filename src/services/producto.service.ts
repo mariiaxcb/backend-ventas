@@ -1,44 +1,66 @@
-import { prisma } from "@/config/database";
-import { AppError } from "@/middlewares/error.middleware";
+import { prisma } from '@/config/database'
+import { AppError } from '@/middlewares/error.middleware'
 
-export interface ProductoInput {
-  nombre: string;
-  descripcion?: string;
-  precio: number;
-  stock: number;
-  imagenUrl?: string;
-  activo?: boolean;
+export interface ProductInput {
+  name: string
+  description?: string
+  price: number
+  stock: number
+  imageUrl?: string
+  categoryId: number
 }
 
 export const productoService = {
-  listar: () => prisma.producto.findMany({ orderBy: { createdAt: "desc" } }),
+  listar: () => prisma.product.findMany({ orderBy: { id: 'desc' } }),
 
-  obtener: async (id: string) => {
-    const producto = await prisma.producto.findUnique({ where: { id } });
-    if (!producto) throw new AppError("Producto no encontrado", 404);
-    return producto;
+  obtener: async (id: number) => {
+    const product = await prisma.product.findUnique({ where: { id } })
+    if (!product) throw new AppError('Product not found', 404)
+    return product
   },
 
-  crear: (input: ProductoInput) => prisma.producto.create({ data: input }),
+  crear: (input: ProductInput) =>
+    prisma.product.create({
+      data: {
+        name: input.name,
+        description: input.description,
+        price: input.price,
+        stock: input.stock,
+        imageUrl: input.imageUrl,
+        categoryId: input.categoryId,
+      },
+    }),
 
-  actualizar: async (id: string, input: Partial<ProductoInput>) => {
-    await productoService.obtener(id);
-    return prisma.producto.update({ where: { id }, data: input });
-  },
-
-  eliminar: async (id: string) => {
-    await productoService.obtener(id);
-    return prisma.producto.delete({ where: { id } });
-  },
-
-  descontarStock: async (id: string, cantidad: number) => {
-    const producto = await productoService.obtener(id);
-    if (producto.stock < cantidad) {
-      throw new AppError("Stock insuficiente", 400);
-    }
-    return prisma.producto.update({
+  actualizar: async (id: number, input: Partial<ProductInput>) => {
+    await productoService.obtener(id)
+    return prisma.product.update({
       where: { id },
-      data: { stock: producto.stock - cantidad },
-    });
+      data: {
+        ...(input.name && { name: input.name }),
+        ...(input.description !== undefined && {
+          description: input.description,
+        }),
+        ...(input.price !== undefined && { price: input.price }),
+        ...(input.stock !== undefined && { stock: input.stock }),
+        ...(input.imageUrl !== undefined && { imageUrl: input.imageUrl }),
+        ...(input.categoryId !== undefined && { categoryId: input.categoryId }),
+      },
+    })
   },
-};
+
+  eliminar: async (id: number) => {
+    await productoService.obtener(id)
+    return prisma.product.delete({ where: { id } })
+  },
+
+  descontarStock: async (id: number, cantidad: number) => {
+    const product = await productoService.obtener(id)
+    if (product.stock < cantidad) {
+      throw new AppError('Insufficient stock', 400)
+    }
+    return prisma.product.update({
+      where: { id },
+      data: { stock: product.stock - cantidad },
+    })
+  },
+}

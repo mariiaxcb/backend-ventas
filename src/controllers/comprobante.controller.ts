@@ -1,89 +1,101 @@
-import type { Request, Response, NextFunction } from "express";
-import { prisma } from "@/config/database";
-import { AppError } from "@/middlewares/error.middleware";
-import { encolarProcesamientoOcr } from "@/queues/ocr.queue";
-import { bnbService } from "@/services/bnb.service";
+import type { Request, Response, NextFunction } from 'express'
+import { prisma } from '@/config/database'
+import { AppError } from '@/middlewares/error.middleware'
+import { encolarProcesamientoOcr } from '@/queues/ocr.queue'
+import { bnbService } from '@/services/bnb.service'
 
 export const comprobanteController = {
   /**
    * Recibe la imagen del comprobante (multipart/form-data, campo "comprobante"),
-   * la asocia al pedido y encola el procesamiento OCR de forma asíncrona.
+   * la asocia a la orden y encola el procesamiento OCR de forma asíncrona.
    */
   async subir(req: Request, res: Response, next: NextFunction) {
     try {
-      const { pedidoId } = req.params;
-      if (!req.file) throw new AppError("No se recibió ninguna imagen", 400);
+      const orderId = Number(req.params.pedidoId)
+      if (isNaN(orderId)) throw new AppError('Invalid order ID', 400)
+      if (!req.file) throw new AppError('No image file received', 400)
 
-      const pedido = await prisma.pedido.findUnique({ where: { id: pedidoId } });
-      if (!pedido) throw new AppError("Pedido no encontrado", 404);
+      const order = await prisma.order.findUnique({ where: { id: orderId } })
+      if (!order) throw new AppError('Order not found', 404)
 
-      // En producción, aquí se sube req.file a Supabase Storage y se
-      // guarda la URL pública resultante en lugar de la ruta local.
-      const imagenUrl = req.file.path;
+      const imageUrl = req.file.path
 
-      const comprobante = await prisma.comprobante.create({
-        data: { pedidoId, imagenUrl },
-      });
+      const receipt = await prisma.receipt.create({
+        data: {
+          orderId,
+          imageUrl,
+          validationStatus: 'PENDING',
+        },
+      })
 
       await encolarProcesamientoOcr({
-        pedidoId,
-        comprobanteId: comprobante.id,
+        pedidoId: String(orderId),
+        comprobanteId: String(receipt.id),
         rutaImagen: req.file.path,
-      });
+      })
 
-      res.status(202).json({ mensaje: "Comprobante recibido, procesando OCR", comprobante });
+      res.status(202).json({
+        message: 'Receipt received, processing OCR',
+        receipt,
+      })
     } catch (error) {
-      next(error);
+      next(error)
     }
   },
 
   /**
-   * Segundo paso, posterior al OCR: cruza el monto/referencia detectados
-   * contra el historial de transacciones del BNB antes de validar el pedido.
+   * Segundo paso, posterior al OCR: cruza el monto detectado
+   * contra la transacción esperada antes de validar la orden.
    */
   async verificarConBnb(req: Request, res: Response, next: NextFunction) {
     try {
-      const { pedidoId } = req.params;
+      const orderId = Number(req.params.pedidoId)
+      if (isNaN(orderId)) throw new AppError('Invalid order ID', 400)
 
-      const comprobante = await prisma.comprobante.findUnique({ where: { pedidoId } });
-      if (!comprobante) throw new AppError("Comprobante no encontrado", 404);
-      if (!comprobante.montoDetectado || !comprobante.referenciaBancaria) {
-        throw new AppError("El OCR aún no detectó monto o referencia", 400);
+      const receipt = await prisma.receipt.findUnique({ where: { orderId } })
+      if (!receipt) throw new AppError('Receipt not found', 404)
+      if (!receipt.extractedAmount) {
+        throw new AppError('OCR has not detected an amount yet', 400)
       }
 
-      const resultado = await bnbService.verificarTransaccion({
-        monto: Number(comprobante.montoDetectado),
-        referencia: comprobante.referenciaBancaria,
-        fecha: comprobante.fechaDetectada ?? undefined,
-      });
+      const outcome = await bnbService.verificarTransaccion({
+        monto: Number(receipt.extractedAmount),
+        referencia: String(orderId),
+      })
 
-      const actualizado = await prisma.comprobante.update({
-        where: { pedidoId },
-        data: { verificadoBnb: resultado.encontrada && resultado.montoCoincide },
-      });
+      const updatedReceipt = await prisma.receipt.update({
+        where: { orderId },
+        data: {
+          validationStatus:
+            outcome.encontrada && outcome.montoCoincide
+              ? 'VALIDATED'
+              : 'REJECTED',
+        },
+      })
 
-      res.json({ resultado, comprobante: actualizado });
+      res.json({ outcome, receipt: updatedReceipt })
     } catch (error) {
-      next(error);
+      next(error)
     }
   },
 
-  /** Genera un QR de cobro del BNB para un pedido (alternativa a subir comprobante). */
+  /** Genera un QR de cobro del BNB para una orden (alternativa a subir comprobante). */
   async generarQrBnb(req: Request, res: Response, next: NextFunction) {
     try {
-      const { pedidoId } = req.params;
+      const orderId = Number(req.params.pedidoId)
+      if (isNaN(orderId)) throw new AppError('Invalid order ID', 400)
 
-      const pedido = await prisma.pedido.findUnique({ where: { id: pedidoId } });
-      if (!pedido) throw new AppError("Pedido no encontrado", 404);
+      const order = await prisma.order.findUnique({ where: { id: orderId } })
+      if (!order) throw new AppError('Order not found', 404)
 
       const qr = await bnbService.generarQr({
-        monto: Number(pedido.total),
-        referencia: pedido.codigoPedido,
-      });
+        monto: Number(order.totalPrice),
+        referencia: String(order.id),
+      })
 
-      res.json(qr);
+      res.json(qr)
     } catch (error) {
-      next(error);
+      next(error)
     }
   },
-};
+}

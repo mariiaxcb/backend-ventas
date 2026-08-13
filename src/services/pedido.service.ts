@@ -1,67 +1,93 @@
-import { prisma } from "@/config/database";
-import { AppError } from "@/middlewares/error.middleware";
-import { productoService } from "./producto.service";
-import type { EstadoPedido } from "@prisma/client";
+import { prisma } from '@/config/database'
+import { AppError } from '@/middlewares/error.middleware'
+import { productoService } from './producto.service'
+import { OrderStatus } from '@prisma/client'
 
-function generarCodigoPedido(): string {
-  return `PED-${Date.now().toString(36).toUpperCase()}`;
+export interface CreateOrderItemInput {
+  productId: number
+  quantity: number
+  unitPrice: number
 }
 
-export interface CrearPedidoInput {
-  usuarioTiktok: string;
-  productoId: string;
-  cantidad?: number;
+export interface CreateOrderInput {
+  buyerId: number
+  streamId: number
+  totalPrice: number
+  items: CreateOrderItemInput[]
 }
 
-export interface ValidarPedidoInput {
-  pedidoId: string;
-  estado: EstadoPedido;
-  observacion?: string;
+export interface ValidateOrderInput {
+  orderId: number
+  status: OrderStatus
 }
 
 export const pedidoService = {
-  listar: (estado?: EstadoPedido) =>
-    prisma.pedido.findMany({
-      where: estado ? { estado } : undefined,
-      include: { producto: true, comprobante: true },
-      orderBy: { createdAt: "desc" },
+  listar: (status?: OrderStatus) =>
+    prisma.order.findMany({
+      where: status ? { status } : undefined,
+      include: {
+        buyer: true,
+        stream: true,
+        orderItems: {
+          include: { product: true },
+        },
+        receipt: true,
+      },
+      orderBy: { id: 'desc' },
     }),
 
-  obtener: async (id: string) => {
-    const pedido = await prisma.pedido.findUnique({
+  obtener: async (id: number) => {
+    const order = await prisma.order.findUnique({
       where: { id },
-      include: { producto: true, comprobante: true },
-    });
-    if (!pedido) throw new AppError("Pedido no encontrado", 404);
-    return pedido;
-  },
-
-  crear: async ({ usuarioTiktok, productoId, cantidad = 1 }: CrearPedidoInput) => {
-    const producto = await productoService.obtener(productoId);
-    const total = Number(producto.precio) * cantidad;
-
-    return prisma.pedido.create({
-      data: {
-        usuarioTiktok,
-        productoId,
-        cantidad,
-        total,
-        codigoPedido: generarCodigoPedido(),
+      include: {
+        buyer: true,
+        stream: true,
+        orderItems: {
+          include: { product: true },
+        },
+        receipt: true,
       },
-      include: { producto: true },
-    });
+    })
+    if (!order) throw new AppError('Order not found', 404)
+    return order
   },
 
-  validar: async ({ pedidoId, estado, observacion }: ValidarPedidoInput) => {
-    const pedido = await pedidoService.obtener(pedidoId);
+  crear: async ({ buyerId, streamId, totalPrice, items }: CreateOrderInput) => {
+    return prisma.order.create({
+      data: {
+        buyerId,
+        streamId,
+        totalPrice,
+        status: 'PENDING',
+        orderItems: {
+          create: items.map((item) => ({
+            productId: item.productId,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+          })),
+        },
+      },
+      include: {
+        buyer: true,
+        orderItems: {
+          include: { product: true },
+        },
+      },
+    })
+  },
 
-    if (estado === "VALIDADO") {
-      await productoService.descontarStock(pedido.productoId, pedido.cantidad);
+  validar: async ({ orderId, status }: ValidateOrderInput) => {
+    const order = await pedidoService.obtener(orderId)
+
+    if (status === 'PAID') {
+      for (const item of order.orderItems) {
+        await productoService.descontarStock(item.productId, item.quantity)
+      }
     }
 
-    return prisma.pedido.update({
-      where: { id: pedidoId },
-      data: { estado },
-    });
+    return prisma.order.update({
+      where: { id: orderId },
+      data: { status },
+    })
   },
-};
+}

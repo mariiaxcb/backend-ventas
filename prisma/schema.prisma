@@ -7,147 +7,147 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum EstadoProducto {
-  ACTIVO
-  INACTIVO
-  AGOTADO
+enum ProductStatus {
+  ACTIVE
+  INACTIVE
+  OUT_OF_STOCK
 }
 
-enum EstadoTransmision {
-  PROGRAMADA
-  EN_VIVO
-  FINALIZADA
-  CANCELADA
+enum StreamStatus {
+  SCHEDULED
+  LIVE
+  ENDED
+  CANCELLED
 }
 
-enum EstadoPedido {
-  PENDIENTE
-  EN_REVISION
-  PAGADO
-  RECHAZADO
-  ENTREGADO
-  CANCELADO
+enum OrderStatus {
+  PENDING
+  IN_REVIEW
+  PAID
+  REJECTED
+  DELIVERED
+  CANCELLED
 }
 
-enum EstadoMensaje {
-  ENVIADO
-  ENTREGADO
-  LEIDO
-  FALLIDO
+enum MessageStatus {
+  SENT
+  DELIVERED
+  READ
+  FAILED
 }
 
-enum EstadoComprobante {
-  PENDIENTE
-  VALIDADO
-  RECHAZADO
+enum ReceiptStatus {
+  PENDING
+  VALIDATED
+  REJECTED
 }
 
-enum TipoMovimiento {
-  ENTRADA
-  SALIDA
-  AJUSTE
+enum MovementType {
+  IN
+  OUT
+  ADJUSTMENT
 }
 
-enum EstadoGeneral {
-  ACTIVO
-  INACTIVO
+enum GeneralStatus {
+  ACTIVE
+  INACTIVE
 }
 
-model Categoria {
-  idCategoria     Int           @id @default(autoincrement())
-  nombreCategoria String        @db.VarChar(100)
-  estado          EstadoGeneral @default(ACTIVO)
-  productos       Producto[]
+model Category {
+  id       Int           @id @default(autoincrement())
+  name     String        @db.VarChar(100)
+  status   GeneralStatus @default(ACTIVE)
+  products Product[]
 }
 
-model Producto {
-  idProducto     Int             @id @default(autoincrement())
-  nombreProducto String          @db.VarChar(150)
-  precio         Decimal         @db.Decimal(10, 2)
-  stock          Int             @default(0)
-  descripcion    String?         @db.Text
-  estado         EstadoProducto  @default(ACTIVO)
-  urlImagen      String?         @db.VarChar(255)
-  idCategoria    Int
-  categoria      Categoria       @relation(fields: [idCategoria], references: [idCategoria])
-  detallesPedido DetallePedido[]
-  historiales    Historial[]
+model Product {
+  id                 Int                @id @default(autoincrement())
+  name               String             @db.VarChar(150)
+  price              Decimal            @db.Decimal(10, 2)
+  stock              Int                @default(0)
+  description        String?            @db.Text
+  status             ProductStatus      @default(ACTIVE)
+  imageUrl           String?            @db.VarChar(255)
+  categoryId         Int
+  category           Category           @relation(fields: [categoryId], references: [id])
+  orderItems         OrderItem[]
+  inventoryHistories InventoryHistory[]
 }
 
-model Historial {
-  idHistorial    Int            @id @default(autoincrement())
-  cantidad       Int
-  fecha          DateTime       @default(now())
-  tipoMovimiento TipoMovimiento
-  idProducto     Int
-  producto       Producto       @relation(fields: [idProducto], references: [idProducto])
+model InventoryHistory {
+  id           Int          @id @default(autoincrement())
+  quantity     Int
+  createdAt    DateTime     @default(now())
+  movementType MovementType
+  productId    Int
+  product      Product      @relation(fields: [productId], references: [id])
 }
 
-model Administrador {
-  idAdministrador Int           @id @default(autoincrement())
-  usuario         String        @unique @db.VarChar(50)
-  clave           String        @db.VarChar(255)
-  estado          EstadoGeneral @default(ACTIVO)
-  transmisiones   Transmision[]
+model Admin {
+  id       Int           @id @default(autoincrement())
+  username String        @unique @db.VarChar(50)
+  password String        @db.VarChar(255)
+  status   GeneralStatus @default(ACTIVE)
+  streams  Stream[]
 }
 
-model Transmision {
-  idTransmision   Int               @id @default(autoincrement())
-  fechaInicio     DateTime
-  fechaFin        DateTime?
-  titulo          String            @db.VarChar(150)
-  estado          EstadoTransmision @default(PROGRAMADA)
-  idAdministrador Int
-  administrador   Administrador     @relation(fields: [idAdministrador], references: [idAdministrador])
-  pedidos         Pedido[]
+model Stream {
+  id        Int          @id @default(autoincrement())
+  startDate DateTime
+  endDate   DateTime?
+  title     String       @db.VarChar(150)
+  status    StreamStatus @default(SCHEDULED)
+  adminId   Int
+  admin     Admin        @relation(fields: [adminId], references: [id])
+  orders    Order[]
 }
 
-model Comprador {
-  idComprador   Int      @id @default(autoincrement())
-  usuarioTiktok String?  @db.VarChar(50)
-  whatsapp      String   @db.VarChar(20)
-  nombreCliente String   @db.VarChar(100)
-  fechaRegistro DateTime @default(now())
-  pedidos       Pedido[]
+model Buyer {
+  id             Int      @id @default(autoincrement())
+  tiktokUsername String?  @db.VarChar(50)
+  whatsapp       String   @db.VarChar(20)
+  clientName     String   @db.VarChar(100)
+  createdAt      DateTime @default(now())
+  orders         Order[]
 }
 
-model Pedido {
-  idPedido      Int          @id @default(autoincrement())
-  precioTotal   Decimal      @db.Decimal(10, 2)
-  estado        EstadoPedido @default(PENDIENTE)
-  idComprador   Int
-  comprador     Comprador    @relation(fields: [idComprador], references: [idComprador])
-  idTransmision Int
-  transmision   Transmision  @relation(fields: [idTransmision], references: [idTransmision])
+model Order {
+  id         Int         @id @default(autoincrement())
+  totalPrice Decimal     @db.Decimal(10, 2)
+  status     OrderStatus @default(PENDING)
+  buyerId    Int
+  buyer      Buyer       @relation(fields: [buyerId], references: [id])
+  streamId   Int
+  stream     Stream      @relation(fields: [streamId], references: [id])
 
-  detallesPedido DetallePedido[]
-  mensajes       Mensaje[]
-  comprobante    Comprobante?
+  orderItems OrderItem[]
+  messages   Message[]
+  receipt    Receipt?
 }
 
-model DetallePedido {
-  idDetallePedido Int      @id @default(autoincrement())
-  cantidad        Int
-  precioUnitario  Decimal  @db.Decimal(10, 2)
-  idProducto      Int
-  producto        Producto @relation(fields: [idProducto], references: [idProducto])
-  idPedido        Int
-  pedido          Pedido   @relation(fields: [idPedido], references: [idPedido])
+model OrderItem {
+  id        Int     @id @default(autoincrement())
+  quantity  Int
+  unitPrice Decimal @db.Decimal(10, 2)
+  productId Int
+  product   Product @relation(fields: [productId], references: [id])
+  orderId   Int
+  order     Order   @relation(fields: [orderId], references: [id])
 }
 
-model Mensaje {
-  idMensaje Int           @id @default(autoincrement())
-  contenido String        @db.Text
-  estado    EstadoMensaje @default(ENVIADO)
-  idPedido  Int
-  pedido    Pedido        @relation(fields: [idPedido], references: [idPedido])
+model Message {
+  id      Int           @id @default(autoincrement())
+  content String        @db.Text
+  status  MessageStatus @default(SENT)
+  orderId Int
+  order   Order         @relation(fields: [orderId], references: [id])
 }
 
-model Comprobante {
-  idComprobante   Int               @id @default(autoincrement())
-  imagenUrl       String            @db.VarChar(255)
-  montoExtraido   Decimal?          @db.Decimal(10, 2)
-  estadoValidacion EstadoComprobante @default(PENDIENTE)
-  idPedido        Int               @unique
-  pedido          Pedido            @relation(fields: [idPedido], references: [idPedido])
+model Receipt {
+  id               Int           @id @default(autoincrement())
+  imageUrl         String        @db.VarChar(255)
+  extractedAmount  Decimal?      @db.Decimal(10, 2)
+  validationStatus ReceiptStatus @default(PENDING)
+  orderId          Int           @unique
+  order            Order         @relation(fields: [orderId], references: [id])
 }

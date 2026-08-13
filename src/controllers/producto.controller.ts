@@ -1,57 +1,62 @@
-import type { Request, Response, NextFunction } from "express";
-import { z } from "zod";
-import { productoService } from "@/services/producto.service";
+import type { Request, Response, NextFunction } from 'express'
+import { z } from 'zod'
+import { productoService } from '@/services/producto.service'
 
-const productoSchema = z.object({
-  nombre: z.string().min(2),
-  descripcion: z.string().optional(),
-  precio: z.number().positive(),
-  stock: z.number().int().min(0),
-  imagenUrl: z.string().url().optional(),
-  activo: z.boolean().optional(),
-});
+const productSchema = z.object({
+  name: z.string().min(1, 'Name is required'),
+  description: z.string().optional(),
+  price: z.number().positive('Price must be positive'),
+  stock: z.number().int().min(0, 'Stock cannot be negative'),
+  imageUrl: z.string().url().optional(),
+  categoryId: z.number().int().positive('Category ID is required'),
+})
+
+const updateProductSchema = productSchema.partial()
 
 export const productoController = {
-  async listar(_req: Request, res: Response, next: NextFunction) {
+  async listar(req: Request, res: Response, next: NextFunction) {
     try {
-      res.json(await productoService.listar());
+      res.json(await productoService.listar())
     } catch (error) {
-      next(error);
+      next(error)
     }
   },
 
   async obtener(req: Request, res: Response, next: NextFunction) {
     try {
-      res.json(await productoService.obtener(req.params.id));
+      const id = Number(req.params.id)
+      res.json(await productoService.obtener(id))
     } catch (error) {
-      next(error);
+      next(error)
     }
   },
 
   async crear(req: Request, res: Response, next: NextFunction) {
     try {
-      const input = productoSchema.parse(req.body);
-      res.status(201).json(await productoService.crear(input));
+      const input = productSchema.parse(req.body)
+      res.status(201).json(await productoService.crear(input))
     } catch (error) {
-      next(error);
+      next(error)
     }
   },
 
   async actualizar(req: Request, res: Response, next: NextFunction) {
     try {
-      const input = productoSchema.partial().parse(req.body);
-      res.json(await productoService.actualizar(req.params.id, input));
+      const id = Number(req.params.id)
+      const input = updateProductSchema.parse(req.body)
+      res.json(await productoService.actualizar(id, input))
     } catch (error) {
-      next(error);
+      next(error)
     }
   },
 
   async eliminar(req: Request, res: Response, next: NextFunction) {
     try {
-      await productoService.eliminar(req.params.id);
-      res.status(204).send();
+      const id = Number(req.params.id)
+      await productoService.eliminar(id)
+      res.status(204).send()
     } catch (error) {
-      next(error);
+      next(error)
     }
   },
-};
+}

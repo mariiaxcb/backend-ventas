@@ -1,12 +1,12 @@
-import { Router } from "express";
-import authRoutes from "./auth.routes";
-import productoRoutes from "./producto.routes";
-import pedidoRoutes from "./pedido.routes";
+import { Router } from 'express'
+import authRoutes from './auth.routes'
+import productoRoutes from './producto.routes'
+import pedidoRoutes from './pedido.routes'
 
-const router = Router();
+const apiRouter = Router()
 
-router.use("/auth", authRoutes);
-router.use("/productos", productoRoutes);
-router.use("/pedidos", pedidoRoutes);
+apiRouter.use('/auth', authRoutes)
+apiRouter.use('/products', productoRoutes)
+apiRouter.use('/orders', pedidoRoutes)
 
-export default router;
+export default apiRouter

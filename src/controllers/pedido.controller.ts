@@ -1,60 +1,71 @@
-import type { Request, Response, NextFunction } from "express";
-import { z } from "zod";
-import { pedidoService } from "@/services/pedido.service";
-import { emitirPedidoNuevo, emitirPedidoActualizado } from "@/websockets/events/pedido.event";
+import type { Request, Response, NextFunction } from 'express'
+import { z } from 'zod'
+import { pedidoService } from '@/services/pedido.service'
+import {
+  emitirPedidoNuevo,
+  emitirPedidoActualizado,
+} from '@/websockets/events/pedido.event'
+import { OrderStatus } from '@prisma/client'
 
-const crearPedidoSchema = z.object({
-  usuarioTiktok: z.string().min(1),
-  productoId: z.string().uuid(),
-  cantidad: z.number().int().positive().optional(),
-});
+const orderItemSchema = z.object({
+  productId: z.number().int().positive(),
+  quantity: z.number().int().positive(),
+  unitPrice: z.number().positive(),
+})
 
-const validarPedidoSchema = z.object({
-  estado: z.enum(["VALIDADO", "RECHAZADO"]),
-  observacion: z.string().optional(),
-});
+const createOrderSchema = z.object({
+  buyerId: z.number().int().positive(),
+  streamId: z.number().int().positive(),
+  totalPrice: z.number().positive(),
+  items: z.array(orderItemSchema).min(1, 'At least one item is required'),
+})
+
+const validateOrderSchema = z.object({
+  status: z.nativeEnum(OrderStatus),
+})
 
 export const pedidoController = {
   async listar(req: Request, res: Response, next: NextFunction) {
     try {
-      const estado = req.query.estado as "PENDIENTE" | "VALIDADO" | "RECHAZADO" | undefined;
-      res.json(await pedidoService.listar(estado));
+      const status = req.query.status as OrderStatus | undefined
+      res.json(await pedidoService.listar(status))
     } catch (error) {
-      next(error);
+      next(error)
     }
   },
 
   async obtener(req: Request, res: Response, next: NextFunction) {
     try {
-      res.json(await pedidoService.obtener(req.params.id));
+      const id = Number(req.params.id)
+      res.json(await pedidoService.obtener(id))
     } catch (error) {
-      next(error);
+      next(error)
     }
   },
 
   async crear(req: Request, res: Response, next: NextFunction) {
     try {
-      const input = crearPedidoSchema.parse(req.body);
-      const pedido = await pedidoService.crear(input);
-      emitirPedidoNuevo(pedido);
-      res.status(201).json(pedido);
+      const input = createOrderSchema.parse(req.body)
+      const order = await pedidoService.crear(input)
+      emitirPedidoNuevo(order)
+      res.status(201).json(order)
     } catch (error) {
-      next(error);
+      next(error)
     }
   },
 
   async validar(req: Request, res: Response, next: NextFunction) {
     try {
-      const { estado, observacion } = validarPedidoSchema.parse(req.body);
-      const pedido = await pedidoService.validar({
-        pedidoId: req.params.id,
-        estado,
-        observacion,
-      });
-      emitirPedidoActualizado(pedido);
-      res.json(pedido);
+      const id = Number(req.params.id)
+      const { status } = validateOrderSchema.parse(req.body)
+      const order = await pedidoService.validar({
+        orderId: id,
+        status,
+      })
+      emitirPedidoActualizado(order)
+      res.json(order)
     } catch (error) {
-      next(error);
+      next(error)
     }
   },
-};
+}

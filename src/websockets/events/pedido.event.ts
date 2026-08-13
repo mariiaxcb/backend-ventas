@@ -1,12 +1,12 @@
-import { getIO } from "../socket.server";
-import type { Pedido } from "@prisma/client";
+import { getIO } from '../socket.server'
+import type { Order } from '@prisma/client'
 
 /** Notifica al panel que se creó un nuevo pedido. */
-export function emitirPedidoNuevo(pedido: Pedido) {
-  getIO().emit("pedido:nuevo", { pedido });
+export function emitirPedidoNuevo(order: Order) {
+  getIO().emit('pedido:nuevo', { order })
 }
 
-/** Notifica al panel que un pedido cambió de estado (validado/rechazado). */
-export function emitirPedidoActualizado(pedido: Pedido) {
-  getIO().emit("pedido:actualizado", { pedido });
+/** Notifica al panel que un pedido cambió de estado. */
+export function emitirPedidoActualizado(order: Order) {
+  getIO().emit('pedido:actualizado', { order })
 }
