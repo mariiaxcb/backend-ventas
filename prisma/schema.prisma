@@ -1,0 +1,86 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum RolUsuario {
+  ADMIN
+  OPERADOR
+}
+
+enum EstadoPedido {
+  PENDIENTE
+  VALIDADO
+  RECHAZADO
+}
+
+model Usuario {
+  id        String     @id @default(uuid())
+  nombre    String
+  email     String     @unique
+  password  String
+  rol       RolUsuario @default(OPERADOR)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  @@map("usuarios")
+}
+
+model Producto {
+  id          String    @id @default(uuid())
+  nombre      String
+  descripcion String?
+  precio      Decimal   @db.Decimal(10, 2)
+  stock       Int       @default(0)
+  imagenUrl   String?
+  activo      Boolean   @default(true)
+  pedidos     Pedido[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@map("productos")
+}
+
+model Pedido {
+  id             String        @id @default(uuid())
+  usuarioTiktok  String
+  codigoPedido   String        @unique
+  producto       Producto      @relation(fields: [productoId], references: [id])
+  productoId     String
+  cantidad       Int           @default(1)
+  total          Decimal       @db.Decimal(10, 2)
+  estado         EstadoPedido  @default(PENDIENTE)
+  comprobante    Comprobante?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@map("pedidos")
+}
+
+model Comprobante {
+  id                String   @id @default(uuid())
+  pedido            Pedido   @relation(fields: [pedidoId], references: [id])
+  pedidoId          String   @unique
+  imagenUrl         String
+  ocrTexto          String?
+  montoDetectado    Decimal? @db.Decimal(10, 2)
+  fechaDetectada    DateTime?
+  referenciaBancaria String?
+  verificadoBnb     Boolean  @default(false)
+  createdAt         DateTime @default(now())
+
+  @@map("comprobantes")
+}
+
+model LiveSession {
+  id          String   @id @default(uuid())
+  tiktokRoomId String
+  iniciadoEn  DateTime @default(now())
+  finalizadoEn DateTime?
+
+  @@map("live_sessions")
+}
