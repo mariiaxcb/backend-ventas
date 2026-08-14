@@ -5,7 +5,7 @@ import { z } from 'zod'
 import { prisma } from '@/config/database'
 import { env } from '@/config/env.config'
 import { AppError } from '@/middlewares/error.middleware'
-import { sendSuccess } from '@/utils/response.util'
+import { sendSuccess } from '@/utils/response.utils'
 
 const loginSchema = z.object({
   username: z.string().min(1, 'Username is required'),
