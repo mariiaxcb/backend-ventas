@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { prisma } from '@/config/database'
 import { env } from '@/config/env.config'
 import { AppError } from '@/middlewares/error.middleware'
+import { sendSuccess } from '@/utils/response.util'
 
 const loginSchema = z.object({
   username: z.string().min(1, 'Username is required'),
@@ -32,15 +33,18 @@ export const authController = {
         { expiresIn: env.JWT_EXPIRES_IN as jwt.SignOptions['expiresIn'] },
       )
 
-      res.json({
-        message: 'Login successful',
-        token,
-        user: {
-          id: admin.id,
-          username: admin.username,
-          status: admin.status,
+      return sendSuccess(
+        res,
+        {
+          token,
+          user: {
+            id: admin.id,
+            username: admin.username,
+            status: admin.status,
+          },
         },
-      })
+        'Login successful',
+      )
     } catch (error) {
       next(error)
     }

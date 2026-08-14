@@ -22,6 +22,10 @@ const envSchema = z.object({
   SUPABASE_SERVICE_ROLE_KEY: z.string().optional(),
   SUPABASE_BUCKET: z.string().default("comprobantes"),
 
+  CLOUDINARY_CLOUD_NAME: z.string().optional(),
+  CLOUDINARY_API_KEY: z.string().optional(),
+  CLOUDINARY_API_SECRET: z.string().optional(),
+
   FRONTEND_URL: z.string().default("http://localhost:3000"),
 
   BNB_API_BASE_URL: z.string().default("https://api.bnb.com.bo"),

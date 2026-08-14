@@ -6,19 +6,19 @@ import { bnbService } from '@/services/bnb.service'
 
 export const comprobanteController = {
   /**
-   * Recibe la imagen del comprobante (multipart/form-data, campo "comprobante"),
-   * la asocia a la orden y encola el procesamiento OCR de forma asíncrona.
+   * Recibe la imagen del comprobante subida a Cloudinary (multipart/form-data, campo "receipt"),
+   * la asocia a la orden en la BD y encola el procesamiento OCR.
    */
   async subir(req: Request, res: Response, next: NextFunction) {
     try {
       const orderId = Number(req.params.pedidoId)
       if (isNaN(orderId)) throw new AppError('Invalid order ID', 400)
-      if (!req.file) throw new AppError('No image file received', 400)
+      if (!req.file) throw new AppError('No receipt image received', 400)
 
       const order = await prisma.order.findUnique({ where: { id: orderId } })
       if (!order) throw new AppError('Order not found', 404)
 
-      const imageUrl = req.file.path
+      const imageUrl = req.file.path // URL devuelta por Cloudinary
 
       const receipt = await prisma.receipt.create({
         data: {
@@ -31,11 +31,11 @@ export const comprobanteController = {
       await encolarProcesamientoOcr({
         pedidoId: String(orderId),
         comprobanteId: String(receipt.id),
-        rutaImagen: req.file.path,
+        rutaImagen: imageUrl,
       })
 
       res.status(202).json({
-        message: 'Receipt received, processing OCR',
+        message: 'Receipt uploaded successfully to Cloudinary, processing OCR',
         receipt,
       })
     } catch (error) {
@@ -44,8 +44,7 @@ export const comprobanteController = {
   },
 
   /**
-   * Segundo paso, posterior al OCR: cruza el monto detectado
-   * contra la transacción esperada antes de validar la orden.
+   * Verifica los datos detectados por el OCR contra el BNB.
    */
   async verificarConBnb(req: Request, res: Response, next: NextFunction) {
     try {
@@ -79,7 +78,7 @@ export const comprobanteController = {
     }
   },
 
-  /** Genera un QR de cobro del BNB para una orden (alternativa a subir comprobante). */
+  /** Genera un QR de cobro del BNB para una orden. */
   async generarQrBnb(req: Request, res: Response, next: NextFunction) {
     try {
       const orderId = Number(req.params.pedidoId)

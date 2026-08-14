@@ -33,7 +33,17 @@ export const productoController = {
 
   async crear(req: Request, res: Response, next: NextFunction) {
     try {
-      const input = productSchema.parse(req.body)
+      const bodyData = {
+        ...req.body,
+        price: req.body.price ? Number(req.body.price) : undefined,
+        stock: req.body.stock ? Number(req.body.stock) : undefined,
+        categoryId: req.body.categoryId
+          ? Number(req.body.categoryId)
+          : undefined,
+        ...(req.file && { imageUrl: req.file.path }),
+      }
+
+      const input = productSchema.parse(bodyData)
       res.status(201).json(await productoService.crear(input))
     } catch (error) {
       next(error)
@@ -43,7 +53,15 @@ export const productoController = {
   async actualizar(req: Request, res: Response, next: NextFunction) {
     try {
       const id = Number(req.params.id)
-      const input = updateProductSchema.parse(req.body)
+      const bodyData = {
+        ...req.body,
+        ...(req.body.price && { price: Number(req.body.price) }),
+        ...(req.body.stock && { stock: Number(req.body.stock) }),
+        ...(req.body.categoryId && { categoryId: Number(req.body.categoryId) }),
+        ...(req.file && { imageUrl: req.file.path }),
+      }
+
+      const input = updateProductSchema.parse(bodyData)
       res.json(await productoService.actualizar(id, input))
     } catch (error) {
       next(error)
