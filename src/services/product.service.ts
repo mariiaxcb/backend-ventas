@@ -1,5 +1,6 @@
 import { prisma } from '@/config/database'
 import { AppError } from '@/middlewares/error.middleware'
+import { ProductStatus } from '@prisma/client'
 
 export interface CreateProductInput {
   name: string
@@ -17,14 +18,37 @@ export interface UpdateProductInput {
   stock?: number
   imageUrl?: string
   categoryName?: string
+  status?: ProductStatus
+}
+
+export interface ProductFilters {
+  status?: ProductStatus
+  categoryId?: number
+  inStock?: boolean
 }
 
 export const productService = {
-  list: () =>
-    prisma.product.findMany({
+  list: (filters?: ProductFilters) => {
+    const where: any = {}
+
+    if (filters?.status) {
+      where.status = filters.status
+    }
+
+    if (filters?.categoryId) {
+      where.categoryId = filters.categoryId
+    }
+
+    if (filters?.inStock !== undefined) {
+      where.stock = filters.inStock ? { gt: 0 } : { equals: 0 }
+    }
+
+    return prisma.product.findMany({
+      where,
       include: { category: true },
       orderBy: { id: 'desc' },
-    }),
+    })
+  },
 
   getById: async (id: number) => {
     const product = await prisma.product.findUnique({

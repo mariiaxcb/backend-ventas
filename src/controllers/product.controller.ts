@@ -2,6 +2,7 @@ import type { Request, Response, NextFunction } from 'express'
 import { z } from 'zod'
 import { productService } from '@/services/product.service'
 import { sendSuccess } from '@/utils/response.util'
+import { ProductStatus } from '@prisma/client'
 
 const productSchema = z.object({
   name: z.string().min(1, 'Name is required'),
@@ -12,12 +13,24 @@ const productSchema = z.object({
   categoryName: z.string().min(1, 'Category name is required'),
 })
 
-const updateProductSchema = productSchema.partial()
+const updateProductSchema = productSchema.partial().extend({
+  status: z.nativeEnum(ProductStatus).optional(),
+})
+
+const listQuerySchema = z.object({
+  status: z.nativeEnum(ProductStatus).optional(),
+  categoryId: z.coerce.number().int().positive().optional(),
+  inStock: z
+    .enum(['true', 'false'])
+    .transform((val) => val === 'true')
+    .optional(),
+})
 
 export const productController = {
   async list(req: Request, res: Response, next: NextFunction) {
     try {
-      const products = await productService.list()
+      const filters = listQuerySchema.parse(req.query)
+      const products = await productService.list(filters)
       return sendSuccess(res, products, 'Products retrieved successfully')
     } catch (error) {
       next(error)
@@ -62,6 +75,7 @@ export const productController = {
         ...(req.body.categoryName !== undefined && {
           categoryName: req.body.categoryName,
         }),
+        ...(req.body.status !== undefined && { status: req.body.status }),
         ...(req.file && { imageUrl: req.file.path }),
       }
 
