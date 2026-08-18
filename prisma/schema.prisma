@@ -55,7 +55,7 @@ enum GeneralStatus {
 
 model Category {
   id       Int           @id @default(autoincrement())
-  name     String        @db.VarChar(100)
+  name     String        @unique @db.VarChar(100)
   status   GeneralStatus @default(ACTIVE)
   products Product[]
 }
@@ -67,7 +67,7 @@ model Product {
   stock              Int                @default(0)
   description        String?            @db.Text
   status             ProductStatus      @default(ACTIVE)
-  imageUrl           String?            @db.VarChar(255)
+  imageUrl           String?            @db.Text
   categoryId         Int
   category           Category           @relation(fields: [categoryId], references: [id])
   orderItems         OrderItem[]

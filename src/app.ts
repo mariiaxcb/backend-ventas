@@ -25,7 +25,7 @@ app.get('/health', (_req, res) => {
   res.json({ status: 'ok' })
 })
 
-app.use('/api/v1', apiRouter)
+app.use('/api', apiRouter)
 app.use('/webhooks', webhookRoutes)
 
 app.use(notFoundHandler)

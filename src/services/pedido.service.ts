@@ -1,6 +1,6 @@
 import { prisma } from '@/config/database'
 import { AppError } from '@/middlewares/error.middleware'
-import { productoService } from './producto.service'
+import { productService } from './product.service'
 import { OrderStatus } from '@prisma/client'
 
 export interface CreateOrderItemInput {
@@ -81,7 +81,7 @@ export const pedidoService = {
 
     if (status === 'PAID') {
       for (const item of order.orderItems) {
-        await productoService.descontarStock(item.productId, item.quantity)
+        await productService.decreaseStock(item.productId, item.quantity)
       }
     }
 

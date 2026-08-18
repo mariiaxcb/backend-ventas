@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import authRoutes from './auth.routes'
-import productoRoutes from './producto.routes'
+import productoRoutes from './product.routes'
 import pedidoRoutes from './pedido.routes'
 import comprobanteRoutes from './comprobante.routes'
 
