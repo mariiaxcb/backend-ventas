@@ -10,11 +10,16 @@ import webhookRoutes from '@/routes/webhook.routes'
 import { errorHandler, notFoundHandler } from '@/middlewares/error.middleware'
 import { logger } from '@/utils/logger'
 
+import swaggerUi from 'swagger-ui-express'
+import { swaggerSpec } from '@/config/swagger.config'
+
 import './queues/ocr.queue'
 import './queues/whatsapp.queue'
 
 const app = express()
 const server = http.createServer(app)
+
+app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec))
 
 app.use(helmet())
 app.use(cors({ origin: env.FRONTEND_URL, credentials: true }))
