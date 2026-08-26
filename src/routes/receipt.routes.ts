@@ -11,7 +11,7 @@ router.use(verificarToken)
  * @openapi
  * /receipts/{orderId}/upload:
  *   post:
- *     summary: Subir imagen de comprobante de pago para una orden
+ *     summary: Subir imagen de comprobante de pago
  *     tags:
  *       - Receipts
  *     parameters:
@@ -37,11 +37,7 @@ router.use(verificarToken)
  *                 example: 301.00
  *     responses:
  *       201:
- *         description: Comprobante subido exitosamente y orden cambiada a IN_REVIEW
- *       400:
- *         description: Archivo no proporcionado
- *       404:
- *         description: Orden no encontrada
+ *         description: Comprobante subido y orden pasada a IN_REVIEW
  */
 router.post(
   '/:orderId/upload',
@@ -53,7 +49,7 @@ router.post(
  * @openapi
  * /receipts/{orderId}:
  *   get:
- *     summary: Obtener el comprobante de pago de una orden
+ *     summary: Obtener comprobante de una orden
  *     tags:
  *       - Receipts
  *     parameters:
@@ -65,9 +61,39 @@ router.post(
  *     responses:
  *       200:
  *         description: Comprobante encontrado
- *       404:
- *         description: Comprobante no encontrado
  */
 router.get('/:orderId', receiptController.getByOrderId)
+
+/**
+ * @openapi
+ * /receipts/{orderId}/validate:
+ *   patch:
+ *     summary: Validar o rechazar un comprobante (descuenta stock y registra auditoría si es VALIDATED)
+ *     tags:
+ *       - Receipts
+ *     parameters:
+ *       - in: path
+ *         name: orderId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - status
+ *             properties:
+ *               status:
+ *                 type: string
+ *                 enum: [VALIDATED, REJECTED]
+ *                 example: VALIDATED
+ *     responses:
+ *       200:
+ *         description: Comprobante y orden actualizados exitosamente
+ */
+router.patch('/:orderId/validate', receiptController.validate)
 
 export default router

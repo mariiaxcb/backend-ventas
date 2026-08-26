@@ -1,6 +1,7 @@
 import { prisma } from '@/config/database'
 import { AppError } from '@/middlewares/error.middleware'
-import { OrderStatus, ReceiptStatus } from '@prisma/client'
+import { OrderStatus, ReceiptStatus, MovementType } from '@prisma/client'
+import { inventoryService } from './inventory.service'
 
 export interface UploadReceiptInput {
   orderId: number
@@ -65,5 +66,39 @@ export const receiptService = {
     }
 
     return receipt
+  },
+
+  validateReceipt: async (orderId: number, status: ReceiptStatus) => {
+    const receipt = await receiptService.getByOrderId(orderId)
+
+    if (receipt.validationStatus === ReceiptStatus.VALIDATED) {
+      throw new AppError('Receipt is already validated', 400)
+    }
+
+    if (status === ReceiptStatus.VALIDATED) {
+      for (const item of receipt.order.orderItems) {
+        await inventoryService.registerMovement({
+          productId: item.productId,
+          quantity: item.quantity,
+          movementType: MovementType.OUT,
+        })
+      }
+
+      await prisma.order.update({
+        where: { id: orderId },
+        data: { status: OrderStatus.PAID },
+      })
+    } else if (status === ReceiptStatus.REJECTED) {
+      await prisma.order.update({
+        where: { id: orderId },
+        data: { status: OrderStatus.REJECTED },
+      })
+    }
+
+    return prisma.receipt.update({
+      where: { orderId },
+      data: { validationStatus: status },
+      include: { order: true },
+    })
   },
 }

@@ -54,7 +54,17 @@
 
 ## 🧾 6. Comprobantes (`/receipts`)
 
-| Método | Endpoint                    | Auth  | Content-Type          | Parámetros / Body                                              | Descripción                                                |
-| :----- | :-------------------------- | :---- | :-------------------- | :------------------------------------------------------------- | :--------------------------------------------------------- |
-| `POST` | `/receipts/:orderId/upload` | 🔒 Sí | `multipart/form-data` | Param: `orderId` + File: `image`, `extractedAmount` (opcional) | Subir comprobante a Cloudinary y pasar orden a `IN_REVIEW` |
-| `GET`  | `/receipts/:orderId`        | 🔒 Sí | -                     | Param: `orderId`                                               | Obtener el comprobante y detalle de la orden asociada      |
+| Método  | Endpoint                      | Auth  | Content-Type          | Parámetros / Body                                              | Descripción                                                          |
+| :------ | :---------------------------- | :---- | :-------------------- | :------------------------------------------------------------- | :------------------------------------------------------------------- |
+| `POST`  | `/receipts/:orderId/upload`   | 🔒 Sí | `multipart/form-data` | Param: `orderId` + File: `image`, `extractedAmount` (opcional) | Subir comprobante y pasar orden a `IN_REVIEW`                        |
+| `GET`   | `/receipts/:orderId`          | 🔒 Sí | -                     | Param: `orderId`                                               | Obtener el comprobante y detalle de orden                            |
+| `PATCH` | `/receipts/:orderId/validate` | 🔒 Sí | `application/json`    | Param: `orderId` + `status: VALIDATED \| REJECTED`             | Validar comprobante (marca `PAID`, descuenta stock y registra `OUT`) |
+
+---
+
+## 📊 7. Inventario (`/inventory`)
+
+| Método | Endpoint                        | Auth  | Content-Type       | Parámetros / Body                                                | Descripción                                     |
+| :----- | :------------------------------ | :---- | :----------------- | :--------------------------------------------------------------- | :---------------------------------------------- |
+| `GET`  | `/inventory/product/:productId` | 🔒 Sí | -                  | Param: `productId`                                               | Obtener historial de movimientos de un producto |
+| `POST` | `/inventory/movement`           | 🔒 Sí | `application/json` | `productId`, `quantity`, `movementType: IN \| OUT \| ADJUSTMENT` | Registrar movimiento manual de stock            |
