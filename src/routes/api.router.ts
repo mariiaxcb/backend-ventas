@@ -4,7 +4,7 @@ import productRoutes from './product.routes'
 import streamRoutes from './stream.routes'
 import orderRoutes from './order.routes'
 import messageRoutes from './message.routes'
-import comprobanteRoutes from './comprobante.routes'
+import receiptRoutes from './receipt.routes'
 
 const apiRouter = Router()
 
@@ -13,6 +13,6 @@ apiRouter.use('/products', productRoutes)
 apiRouter.use('/streams', streamRoutes)
 apiRouter.use('/orders', orderRoutes)
 apiRouter.use('/messages', messageRoutes)
-apiRouter.use('/receipts', comprobanteRoutes)
+apiRouter.use('/receipts', receiptRoutes)
 
 export default apiRouter

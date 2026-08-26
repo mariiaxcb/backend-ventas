@@ -9,24 +9,22 @@ cloudinary.config({
   api_secret: env.CLOUDINARY_API_SECRET,
 })
 
-const createStorage = (folderName: string) => {
-  return new CloudinaryStorage({
-    cloudinary,
-    params: async () => ({
-      folder: `tiktok-live-sales/${folderName}`,
-      allowed_formats: ['jpg', 'jpeg', 'png', 'webp'],
-    }),
-  })
-}
-
-export const uploadProductImage = multer({
-  storage: createStorage('products'),
-  limits: { fileSize: 5 * 1024 * 1024 },
+const productStorage = new CloudinaryStorage({
+  cloudinary,
+  params: {
+    folder: 'tiktok-live-sales/products',
+    allowed_formats: ['jpg', 'jpeg', 'png', 'webp'],
+  } as any,
 })
 
-export const uploadReceiptImage = multer({
-  storage: createStorage('receipts'),
-  limits: { fileSize: 10 * 1024 * 1024 },
+const receiptStorage = new CloudinaryStorage({
+  cloudinary,
+  params: {
+    folder: 'tiktok-live-sales/receipts',
+    allowed_formats: ['jpg', 'jpeg', 'png', 'webp', 'pdf'],
+  } as any,
 })
 
+export const uploadProductImage = multer({ storage: productStorage })
+export const uploadReceiptImage = multer({ storage: receiptStorage })
 export { cloudinary }

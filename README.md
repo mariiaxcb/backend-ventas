@@ -51,3 +51,10 @@
 | `POST`  | `/messages`                | 🔒 Sí | `application/json` | `orderId`, `content`, `status` | Guardar un nuevo mensaje asociado a un pedido             |
 | `GET`   | `/messages/order/:orderId` | 🔒 Sí | -                  | Param: `orderId`               | Obtener historial de mensajes de un pedido                |
 | `PATCH` | `/messages/:id/status`     | 🔒 Sí | `application/json` | Param: `id` + `status`         | Actualizar estado (`SENT`, `DELIVERED`, `READ`, `FAILED`) |
+
+## 🧾 6. Comprobantes (`/receipts`)
+
+| Método | Endpoint                    | Auth  | Content-Type          | Parámetros / Body                                              | Descripción                                                |
+| :----- | :-------------------------- | :---- | :-------------------- | :------------------------------------------------------------- | :--------------------------------------------------------- |
+| `POST` | `/receipts/:orderId/upload` | 🔒 Sí | `multipart/form-data` | Param: `orderId` + File: `image`, `extractedAmount` (opcional) | Subir comprobante a Cloudinary y pasar orden a `IN_REVIEW` |
+| `GET`  | `/receipts/:orderId`        | 🔒 Sí | -                     | Param: `orderId`                                               | Obtener el comprobante y detalle de la orden asociada      |
