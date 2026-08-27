@@ -75,6 +75,19 @@ router.post('/', uploadProductImage.single('image'), productController.create)
 
 /**
  * @openapi
+ * /products/categories:
+ *   get:
+ *     summary: Obtener listado de categorías con total de productos asociados
+ *     tags:
+ *       - Products
+ *     responses:
+ *       200:
+ *         description: Lista de categorías obtenida exitosamente
+ */
+router.get('/categories', productController.getCategories)
+
+/**
+ * @openapi
  * /products/{id}:
  *   get:
  *     summary: Obtener producto por ID

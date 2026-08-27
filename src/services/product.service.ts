@@ -50,6 +50,17 @@ export const productService = {
     })
   },
 
+  getCategories: () => {
+    return prisma.category.findMany({
+      include: {
+        _count: {
+          select: { products: true },
+        },
+      },
+      orderBy: { name: 'asc' },
+    })
+  },
+
   getById: async (id: number) => {
     const product = await prisma.product.findUnique({
       where: { id },

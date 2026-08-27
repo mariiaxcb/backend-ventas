@@ -14,13 +14,14 @@
 
 ## 📦 2. Productos (`/products`)
 
-| Método   | Endpoint        | Auth  | Content-Type                   | Parámetros / Body                                                | Descripción                            |
-| :------- | :-------------- | :---- | :----------------------------- | :--------------------------------------------------------------- | :------------------------------------- |
-| `GET`    | `/products`     | 🔒 Sí | -                              | Query: `inStock`, `status`, `categoryId`                         | Listar todos los productos con filtros |
-| `GET`    | `/products/:id` | 🔒 Sí | -                              | Param: `id`                                                      | Obtener un producto por ID             |
-| `POST`   | `/products`     | 🔒 Sí | `multipart/form-data`          | `name`, `price`, `stock`, `categoryName`, `description`, `image` | Crear un nuevo producto                |
-| `PUT`    | `/products/:id` | 🔒 Sí | `multipart/form-data` / `json` | Param: `id` + campos a modificar                                 | Actualizar información o imagen        |
-| `DELETE` | `/products/:id` | 🔒 Sí | -                              | Param: `id`                                                      | Eliminar un producto                   |
+| Método   | Endpoint               | Auth  | Content-Type                   | Parámetros / Body                                                | Descripción                                          |
+| :------- | :--------------------- | :---- | :----------------------------- | :--------------------------------------------------------------- | :--------------------------------------------------- |
+| `GET`    | `/products`            | 🔒 Sí | -                              | Query: `inStock`, `status`, `categoryId`                         | Listar productos con filtros                         |
+| `GET`    | `/products/categories` | 🔒 Sí | -                              | -                                                                | Obtener listado de categorías con total de productos |
+| `GET`    | `/products/:id`        | 🔒 Sí | -                              | Param: `id`                                                      | Obtener un producto por ID                           |
+| `POST`   | `/products`            | 🔒 Sí | `multipart/form-data`          | `name`, `price`, `stock`, `categoryName`, `description`, `image` | Crear un nuevo producto                              |
+| `PUT`    | `/products/:id`        | 🔒 Sí | `multipart/form-data` / `json` | Param: `id` + campos a modificar                                 | Actualizar información o imagen                      |
+| `DELETE` | `/products/:id`        | 🔒 Sí | -                              | Param: `id`                                                      | Eliminar un producto                                 |
 
 ---
 

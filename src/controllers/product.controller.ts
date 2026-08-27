@@ -37,6 +37,15 @@ export const productController = {
     }
   },
 
+  async getCategories(req: Request, res: Response, next: NextFunction) {
+    try {
+      const categories = await productService.getCategories()
+      return sendSuccess(res, categories, 'Categories retrieved successfully')
+    } catch (error) {
+      next(error)
+    }
+  },
+
   async getById(req: Request, res: Response, next: NextFunction) {
     try {
       const id = Number(req.params.id)
