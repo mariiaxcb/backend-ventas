@@ -6,6 +6,7 @@ import orderRoutes from './order.routes'
 import messageRoutes from './message.routes'
 import receiptRoutes from './receipt.routes'
 import inventoryRoutes from './inventory.routes'
+import dashboardRoutes from './dashboard.routes'
 
 const apiRouter = Router()
 
@@ -16,5 +17,6 @@ apiRouter.use('/orders', orderRoutes)
 apiRouter.use('/messages', messageRoutes)
 apiRouter.use('/receipts', receiptRoutes)
 apiRouter.use('/inventory', inventoryRoutes)
+apiRouter.use('/dashboard', dashboardRoutes)
 
 export default apiRouter

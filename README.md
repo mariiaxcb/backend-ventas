@@ -71,3 +71,9 @@
 | :----- | :------------------------------ | :---- | :----------------- | :--------------------------------------------------------------- | :---------------------------------------------- |
 | `GET`  | `/inventory/product/:productId` | 🔒 Sí | -                  | Param: `productId`                                               | Obtener historial de movimientos de un producto |
 | `POST` | `/inventory/movement`           | 🔒 Sí | `application/json` | `productId`, `quantity`, `movementType: IN \| OUT \| ADJUSTMENT` | Registrar movimiento manual de stock            |
+
+## 📈 8. Dashboard (`/dashboard`)
+
+| Método | Endpoint             | Auth  | Content-Type | Parámetros / Body            | Descripción                                                           |
+| :----- | :------------------- | :---- | :----------- | :--------------------------- | :-------------------------------------------------------------------- |
+| `GET`  | `/dashboard/metrics` | 🔒 Sí | -            | Query: `streamId` (opcional) | Obtiene ingresos totales, órdenes por estado y top productos del Live |
