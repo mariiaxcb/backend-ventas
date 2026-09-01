@@ -1,6 +1,8 @@
 import { prisma } from '@/config/database'
 import { AppError } from '@/middlewares/error.middleware'
-import { OrderStatus, StreamStatus } from '@prisma/client'
+import { OrderStatus, StreamStatus, MovementType } from '@prisma/client'
+import { canelaService } from './canela.service'
+import { inventoryService } from './inventory.service'
 
 export interface OrderItemInput {
   productId: number
@@ -165,5 +167,65 @@ export const orderService = {
         receipt: true,
       },
     })
+  },
+
+  generateQr: async (id: number) => {
+    const order = await orderService.getById(id)
+
+    if (order.status === OrderStatus.PAID) {
+      throw new AppError('Order is already paid', 400)
+    }
+
+    const qrResponse = await canelaService.generateQr({
+      amount: Number(order.totalPrice),
+      gloss: `Pago Orden #${order.id} - ${order.buyer.clientName}`,
+    })
+
+    return prisma.order.update({
+      where: { id },
+      data: { qrId: qrResponse.payment.qrId },
+      include: {
+        buyer: true,
+        orderItems: { include: { product: true } },
+      },
+    })
+  },
+
+  syncPayment: async (id: number) => {
+    const order = await orderService.getById(id)
+
+    if (!order.qrId) {
+      throw new AppError('Order does not have a generated QR', 400)
+    }
+
+    if (order.status === OrderStatus.PAID) {
+      return order
+    }
+
+    const paymentStatus = await canelaService.getPaymentStatus(order.qrId)
+
+    if (paymentStatus.status === 'PAID') {
+      for (const item of order.orderItems) {
+        await inventoryService.registerMovement({
+          productId: item.productId,
+          quantity: item.quantity,
+          movementType: MovementType.OUT,
+        })
+      }
+
+      return prisma.order.update({
+        where: { id },
+        data: {
+          status: OrderStatus.PAID,
+          transactionId: paymentStatus.transactionId,
+        },
+        include: {
+          buyer: true,
+          orderItems: { include: { product: true } },
+        },
+      })
+    }
+
+    return order
   },
 }

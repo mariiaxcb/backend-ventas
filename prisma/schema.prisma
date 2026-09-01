@@ -112,17 +112,19 @@ model Buyer {
 }
 
 model Order {
-  id         Int         @id @default(autoincrement())
-  totalPrice Decimal     @db.Decimal(10, 2)
-  status     OrderStatus @default(PENDING)
-  buyerId    Int
-  buyer      Buyer       @relation(fields: [buyerId], references: [id])
-  streamId   Int
-  stream     Stream      @relation(fields: [streamId], references: [id])
+  id            Int         @id @default(autoincrement())
+  totalPrice    Decimal     @db.Decimal(10, 2)
+  status        OrderStatus @default(PENDING)
+  qrId          String?     @db.VarChar(100)
+  transactionId String?     @db.VarChar(100)
+  buyerId       Int
+  buyer         Buyer       @relation(fields: [buyerId], references: [id])
+  streamId      Int
+  stream        Stream      @relation(fields: [streamId], references: [id])
 
-  orderItems OrderItem[]
-  messages   Message[]
-  receipt    Receipt?
+  orderItems    OrderItem[]
+  messages      Message[]
+  receipt       Receipt?
 }
 
 model OrderItem {

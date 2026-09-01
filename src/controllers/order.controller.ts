@@ -70,4 +70,24 @@ export const orderController = {
       next(error)
     }
   },
+
+  async generateQr(req: Request, res: Response, next: NextFunction) {
+    try {
+      const id = Number(req.params.id)
+      const order = await orderService.generateQr(id)
+      return sendSuccess(res, order, 'QR generated and assigned successfully')
+    } catch (error) {
+      next(error)
+    }
+  },
+
+  async syncPayment(req: Request, res: Response, next: NextFunction) {
+    try {
+      const id = Number(req.params.id)
+      const order = await orderService.syncPayment(id)
+      return sendSuccess(res, order, 'Order payment synchronized successfully')
+    } catch (error) {
+      next(error)
+    }
+  },
 }

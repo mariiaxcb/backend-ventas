@@ -129,4 +129,42 @@ router.get('/:id', orderController.getById)
  */
 router.patch('/:id/status', orderController.updateStatus)
 
+/**
+ * @openapi
+ * /orders/{id}/generate-qr:
+ *   post:
+ *     summary: Generar un QR de cobro para una orden usando Canela API Bank
+ *     tags:
+ *       - Orders
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: QR generado y asignado a la orden
+ */
+router.post('/:id/generate-qr', orderController.generateQr)
+
+/**
+ * @openapi
+ * /orders/{id}/sync-payment:
+ *   post:
+ *     summary: Sincronizar el estado del pago con Canela API Bank (valida si se pagó el QR)
+ *     tags:
+ *       - Orders
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Sincronización completa (Actualiza inventario y estado si el pago fue exitoso)
+ */
+router.post('/:id/sync-payment', orderController.syncPayment)
+
 export default router

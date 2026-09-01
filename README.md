@@ -38,12 +38,14 @@
 
 ## 🛒 4. Pedidos (`/orders`)
 
-| Método  | Endpoint             | Auth  | Content-Type       | Parámetros / Body                                               | Descripción                        |
-| :------ | :------------------- | :---- | :----------------- | :-------------------------------------------------------------- | :--------------------------------- |
-| `POST`  | `/orders`            | 🔒 Sí | `application/json` | `clientName`, `whatsapp`, `tiktokUsername`, `streamId`, `items` | Registrar nuevo pedido y comprador |
-| `GET`   | `/orders`            | 🔒 Sí | -                  | Query: `streamId`, `status`, `buyerId`                          | Listar pedidos con filtros         |
-| `GET`   | `/orders/:id`        | 🔒 Sí | -                  | Param: `id`                                                     | Obtener detalle de un pedido       |
-| `PATCH` | `/orders/:id/status` | 🔒 Sí | `application/json` | Param: `id` + `status`                                          | Cambiar estado de un pedido        |
+| Método  | Endpoint                   | Auth  | Content-Type       | Parámetros / Body                                               | Descripción                                               |
+| :------ | :------------------------- | :---- | :----------------- | :-------------------------------------------------------------- | :-------------------------------------------------------- |
+| `POST`  | `/orders`                  | 🔒 Sí | `application/json` | `clientName`, `whatsapp`, `tiktokUsername`, `streamId`, `items` | Registrar nuevo pedido y comprador                        |
+| `GET`   | `/orders`                  | 🔒 Sí | -                  | Query: `streamId`, `status`, `buyerId`                          | Listar pedidos con filtros                                |
+| `GET`   | `/orders/:id`              | 🔒 Sí | -                  | Param: `id`                                                     | Obtener detalle de un pedido                              |
+| `PATCH` | `/orders/:id/status`       | 🔒 Sí | `application/json` | Param: `id` + `status`                                          | Cambiar estado de un pedido                               |
+| `POST`  | `/orders/:id/generate-qr`  | 🔒 Sí | -                  | Param: `id`                                                     | Generar QR usando Canela API Bank                         |
+| `POST`  | `/orders/:id/sync-payment` | 🔒 Sí | -                  | Param: `id`                                                     | Conciliar pago de Canela API (Actualiza stock si es PAID) |
 
 ## 💬 5. Mensajes (`/messages`)
 
