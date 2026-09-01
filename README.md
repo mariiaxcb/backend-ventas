@@ -77,3 +77,10 @@
 | Método | Endpoint             | Auth  | Content-Type | Parámetros / Body            | Descripción                                                           |
 | :----- | :------------------- | :---- | :----------- | :--------------------------- | :-------------------------------------------------------------------- |
 | `GET`  | `/dashboard/metrics` | 🔒 Sí | -            | Query: `streamId` (opcional) | Obtiene ingresos totales, órdenes por estado y top productos del Live |
+
+## 👥 9. Compradores (`/buyers`)
+
+| Método | Endpoint      | Auth  | Content-Type | Parámetros / Body          | Descripción                                                  |
+| :----- | :------------ | :---- | :----------- | :------------------------- | :----------------------------------------------------------- |
+| `GET`  | `/buyers`     | 🔒 Sí | -            | Query: `search` (opcional) | Lista compradores (búsqueda por nombre o WhatsApp)           |
+| `GET`  | `/buyers/:id` | 🔒 Sí | -            | Param: `id`                | Obtiene el detalle de un comprador y su historial de pedidos |
