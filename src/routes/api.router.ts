@@ -6,7 +6,7 @@ import orderRoutes from './order.routes'
 import messageRoutes from './message.routes'
 import receiptRoutes from './receipt.routes'
 import inventoryRoutes from './inventory.routes'
-
+import tiktokRoutes from './tiktok.routes'
 const apiRouter = Router()
 
 apiRouter.use('/auth', authRoutes)
@@ -16,5 +16,6 @@ apiRouter.use('/orders', orderRoutes)
 apiRouter.use('/messages', messageRoutes)
 apiRouter.use('/receipts', receiptRoutes)
 apiRouter.use('/inventory', inventoryRoutes)
+apiRouter.use('/tiktok', tiktokRoutes)
 
 export default apiRouter

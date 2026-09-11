@@ -32,6 +32,7 @@ const envSchema = z.object({
   BNB_API_KEY: z.string().optional(),
   BNB_ACCOUNT_ID: z.string().optional(),
   BNB_MERCHANT_ID: z.string().optional(),
+  EULER_STREAM_API_KEY: z.string().optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);

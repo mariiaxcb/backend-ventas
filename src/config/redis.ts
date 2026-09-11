@@ -1,18 +1,20 @@
 import Redis from 'ioredis'
-import { env } from './env.config'
+import { env } from '@/config/env.config'
+import { logger } from '@/utils/logger'
 
-export const redisConnection = {
-  host: env.REDIS_HOST,
-  port: Number(env.REDIS_PORT),
-  password: env.REDIS_PASSWORD || undefined,
-}
-
-export const redisClient = new Redis(redisConnection)
-
-redisClient.on('connect', () => {
-  console.log('✅ Redis conectado')
+export const redis = new Redis({
+  host: env.REDIS_HOST || '127.0.0.1',
+  port: Number(env.REDIS_PORT) || 6379,
+  maxRetriesPerRequest: null,
 })
 
-redisClient.on('error', (err) => {
-  console.error('❌ Error de Redis:', err.message)
+redis.on('connect', () => {
+  logger.info('🔴 Conectado exitosamente a Redis')
 })
+
+redis.on('error', (err) => {
+  logger.error('❌ Error de conexión en Redis', { error: err })
+})
+
+// Alias para mantener compatibilidad con las colas (ocr.queue, whatsapp.queue)
+export const redisConnection = redis
