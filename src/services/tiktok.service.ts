@@ -93,37 +93,57 @@ export class TikTokLiveConnectorService {
             comentarioLower.includes(palabra.toLowerCase().trim())
           );
 
-        if (coincideFiltro) {
-          const ventaDetectada: ComentarioFiltrado = {
-            usuario,
-            nickname,
-            fotoPerfil,
-            comentario,
-            fecha: new Date().toISOString(),
-          };
+       if (coincideFiltro) {
+  const usuarioKey = usuario.toLowerCase().trim();
+  const setKey = `live:postulantes_set:${this.currentUsername}`;
+  const listKey = `live:ventas:${this.currentUsername}`;
 
-          logger.info(`🎯 [FILTRO COINCIDE] @${usuario}: "${comentario}"`);
+  try {
+    // 1. Intentar agregar el usuario al Set para garantizar que sea único
+    // SADD devuelve 1 si el usuario es NUEVO, 0 si YA EXISTÍA en el Set
+    const esNuevoUsuario = await redis.sadd(setKey, usuarioKey);
 
-          // Guardar en Redis
-          await redis.lpush(
-            `live:ventas:${this.currentUsername}`,
-            JSON.stringify(ventaDetectada)
-          );
+    if (esNuevoUsuario === 1) {
+      // 2. Verificar cuántos usuarios únicos llevamos registrados
+      const totalPostulantes = await redis.scard(setKey);
 
-          // 🔴 SOLUCIÓN DUPLICADOS: Emitir ÚNICAMENTE a la sala correspondiente
-          if (this.ioSocket) {
-            console.log(
-              `🚀 [EMITIENDO A FRONTEND EN SALA live:${this.currentUsername}]`,
-              ventaDetectada
-            );
+      // 3. Si está dentro de los primeros 3 usuarios, guardarlo
+      if (totalPostulantes <= 3) {
+        const ventaDetectada: ComentarioFiltrado = {
+          usuario,
+          nickname,
+          fotoPerfil,
+          comentario,
+          fecha: new Date().toISOString(),
+        };
 
-            this.ioSocket
-              .to(`live:${this.currentUsername}`)
-              .emit('nueva_intencion_compra', ventaDetectada);
-          } else {
-            console.error('❌ ERROR: this.ioSocket es null, no se puede enviar al Frontend.');
-          }
-        }
+        // Guardar al final de la lista para mantener orden cronológico (de llegada)
+        await redis.rpush(listKey, JSON.stringify(ventaDetectada));
+
+        // Asignar TTL de 24 horas a ambas claves para limpiar memoria automáticamente
+        await redis.expire(setKey, 86400);
+        await redis.expire(listKey, 86400);
+
+        logger.info(`🏆 [POSTULANTE ${totalPostulantes}/3] @${usuario}: "${comentario}"`);
+
+        // Emitir evento al Frontend únicamente si calificó como postulante
+        if (this.ioSocket) {
+          this.ioSocket
+            .to(`live:${this.currentUsername}`)
+            .emit('nueva_intencion_compra', ventaDetectada);
+        }
+      } else {
+        // Opcional: Eliminar del Set si superó la cuota de 3 para mantener coherencia
+        await redis.srem(setKey, usuarioKey);
+        logger.info(`⏳ [CUOTA LLENA] El usuario @${usuario} llegó después de los primeros 3.`);
+      }
+    } else {
+      logger.info(`⚠️ [USUARIO DUPLICADO] @${usuario} ya se había postulado previamente.`);
+    }
+  } catch (redisError) {
+    logger.error('❌ Error gestionando postulantes en Redis:', redisError);
+  }
+}
       });
 
       this.tiktokLiveConnection.on('streamEnd', () => {
