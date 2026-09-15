@@ -89,6 +89,26 @@ router.get('/categories', productController.getCategories)
 
 /**
  * @openapi
+ * /products/check-code:
+ *   get:
+ *     summary: Verificar si un código de producto ya existe en tiempo real
+ *     tags:
+ *       - Products
+ *     parameters:
+ *       - in: query
+ *         name: code
+ *         required: true
+ *         schema:
+ *           type: string
+ *         example: CAM-AZUL-01
+ *     responses:
+ *       200:
+ *         description: Resultado de la verificación
+ */
+router.get('/check-code', productController.checkCode)
+
+/**
+ * @openapi
  * /products/{id}:
  *   get:
  *     summary: Obtener detalle de un producto por ID

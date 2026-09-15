@@ -108,4 +108,17 @@ export const productController = {
       next(error)
     }
   },
+
+  async checkCode(req: Request, res: Response, next: NextFunction) {
+    try {
+      const code = String(req.query.code || '').trim()
+      if (!code) {
+        return sendSuccess(res, { exists: false }, 'Code parameter is required')
+      }
+      const exists = await productService.checkCodeExists(code)
+      return sendSuccess(res, { exists }, 'Code check completed successfully')
+    } catch (error) {
+      next(error)
+    }
+  },
 }

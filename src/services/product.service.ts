@@ -143,4 +143,12 @@ export const productService = {
       data: { stock: product.stock - quantity },
     })
   },
+
+  async checkCodeExists(code: string): Promise<boolean> {
+    const product = await prisma.product.findUnique({
+      where: { code: code.trim() },
+      select: { id: true },
+    })
+    return product !== null
+  },
 }
