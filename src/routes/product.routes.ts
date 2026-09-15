@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import { productController } from '@/controllers/product.controller'
 import { verificarToken } from '@/middlewares/auth.middleware'
-import { uploadProductImage } from '@/config/cloudinary.config'
+import upload from '@/middlewares/upload.middleware'
 
 const router = Router()
 
@@ -11,78 +11,79 @@ router.use(verificarToken)
  * @openapi
  * /products:
  *   get:
- *     summary: Listar productos con filtros
+ *     summary: Listar productos con filtros opcionales
  *     tags:
  *       - Products
  *     parameters:
  *       - in: query
- *         name: inStock
- *         schema:
- *           type: boolean
- *         description: Filtrar si tiene stock (> 0)
- *       - in: query
  *         name: status
  *         schema:
  *           type: string
- *           enum: [ACTIVE, INACTIVE, OUT_OF_STOCK]
+ *           enum: [ACTIVE, INACTIVE]
  *       - in: query
  *         name: categoryId
  *         schema:
  *           type: integer
+ *       - in: query
+ *         name: inStock
+ *         schema:
+ *           type: boolean
  *     responses:
  *       200:
- *         description: Lista de productos obtenida exitosamente
+ *         description: Lista de productos obtenida correctamente
  *   post:
- *     summary: Crear un nuevo producto
+ *     summary: Crear un nuevo producto con código único
  *     tags:
  *       - Products
  *     requestBody:
  *       required: true
  *       content:
- *         multipart/form-data:
+ *         application/json:
  *           schema:
  *             type: object
  *             required:
+ *               - code
  *               - name
  *               - price
  *               - stock
  *               - categoryName
  *             properties:
+ *               code:
+ *                 type: string
+ *                 example: CAM-AZUL-01
  *               name:
  *                 type: string
- *                 example: Polera Gamer RGB
+ *                 example: Camisa Oversize Azul
  *               description:
  *                 type: string
- *                 example: 100% algodón peinado
  *               price:
  *                 type: number
- *                 example: 150.50
+ *                 example: 99.99
  *               stock:
  *                 type: integer
- *                 example: 20
+ *                 example: 25
  *               categoryName:
  *                 type: string
- *                 example: Ropa Urbana
- *               image:
+ *                 example: Camisas
+ *               imageUrl:
  *                 type: string
- *                 format: binary
  *     responses:
  *       201:
  *         description: Producto creado exitosamente
  */
 router.get('/', productController.list)
-router.post('/', uploadProductImage.single('image'), productController.create)
+router.post('/', upload.single('image'), productController.create)
 
 /**
  * @openapi
  * /products/categories:
  *   get:
- *     summary: Obtener listado de categorías con total de productos asociados
+ *     summary: Obtener todas las categorías con conteo de productos
  *     tags:
  *       - Products
  *     responses:
  *       200:
- *         description: Lista de categorías obtenida exitosamente
+ *         description: Lista de categorías
  */
 router.get('/categories', productController.getCategories)
 
@@ -90,7 +91,7 @@ router.get('/categories', productController.getCategories)
  * @openapi
  * /products/{id}:
  *   get:
- *     summary: Obtener producto por ID
+ *     summary: Obtener detalle de un producto por ID
  *     tags:
  *       - Products
  *     parameters:
@@ -102,10 +103,8 @@ router.get('/categories', productController.getCategories)
  *     responses:
  *       200:
  *         description: Detalle del producto
- *       404:
- *         description: Producto no encontrado
  *   put:
- *     summary: Actualizar un producto
+ *     summary: Actualizar un producto existente (incluyendo código, stock, etc.)
  *     tags:
  *       - Products
  *     parameters:
@@ -115,11 +114,15 @@ router.get('/categories', productController.getCategories)
  *         schema:
  *           type: integer
  *     requestBody:
+ *       required: true
  *       content:
- *         multipart/form-data:
+ *         application/json:
  *           schema:
  *             type: object
  *             properties:
+ *               code:
+ *                 type: string
+ *                 example: CAM-AZUL-02
  *               name:
  *                 type: string
  *               description:
@@ -132,10 +135,9 @@ router.get('/categories', productController.getCategories)
  *                 type: string
  *               status:
  *                 type: string
- *                 enum: [ACTIVE, INACTIVE, OUT_OF_STOCK]
- *               image:
+ *                 enum: [ACTIVE, INACTIVE]
+ *               imageUrl:
  *                 type: string
- *                 format: binary
  *     responses:
  *       200:
  *         description: Producto actualizado exitosamente
@@ -154,7 +156,7 @@ router.get('/categories', productController.getCategories)
  *         description: Producto eliminado exitosamente
  */
 router.get('/:id', productController.getById)
-router.put('/:id', uploadProductImage.single('image'), productController.update)
+router.put('/:id', upload.single('image'), productController.update)
 router.delete('/:id', productController.delete)
 
 export default router
