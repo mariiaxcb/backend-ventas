@@ -62,6 +62,7 @@ model Category {
 
 model Product {
   id                 Int                @id @default(autoincrement())
+  code               String             @unique @db.VarChar(50)
   name               String             @db.VarChar(150)
   price              Decimal            @db.Decimal(10, 2)
   stock              Int                @default(0)
@@ -72,6 +73,7 @@ model Product {
   category           Category           @relation(fields: [categoryId], references: [id])
   orderItems         OrderItem[]
   inventoryHistories InventoryHistory[]
+  streams            Stream[]
 }
 
 model InventoryHistory {
@@ -92,14 +94,16 @@ model Admin {
 }
 
 model Stream {
-  id        Int          @id @default(autoincrement())
-  startDate DateTime
-  endDate   DateTime?
-  title     String       @db.VarChar(150)
-  status    StreamStatus @default(SCHEDULED)
-  adminId   Int
-  admin     Admin        @relation(fields: [adminId], references: [id])
-  orders    Order[]
+  id             Int          @id @default(autoincrement())
+  title          String       @db.VarChar(150)
+  tiktokUsername String       @db.VarChar(100)
+  startDate      DateTime     @default(now())
+  endDate        DateTime?
+  status         StreamStatus @default(LIVE)
+  adminId        Int
+  admin          Admin        @relation(fields: [adminId], references: [id])
+  orders         Order[]
+  products       Product[]
 }
 
 model Buyer {

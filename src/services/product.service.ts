@@ -3,6 +3,7 @@ import { AppError } from '@/middlewares/error.middleware'
 import { ProductStatus } from '@prisma/client'
 
 export interface CreateProductInput {
+  code: string
   name: string
   description?: string
   price: number
@@ -12,6 +13,7 @@ export interface CreateProductInput {
 }
 
 export interface UpdateProductInput {
+  code?: string
   name?: string
   description?: string
   price?: number
@@ -31,14 +33,8 @@ export const productService = {
   list: (filters?: ProductFilters) => {
     const where: any = {}
 
-    if (filters?.status) {
-      where.status = filters.status
-    }
-
-    if (filters?.categoryId) {
-      where.categoryId = filters.categoryId
-    }
-
+    if (filters?.status) where.status = filters.status
+    if (filters?.categoryId) where.categoryId = filters.categoryId
     if (filters?.inStock !== undefined) {
       where.stock = filters.inStock ? { gt: 0 } : { equals: 0 }
     }
@@ -73,6 +69,11 @@ export const productService = {
   create: async (data: CreateProductInput) => {
     const { categoryName, ...productData } = data
 
+    const existingCode = await prisma.product.findUnique({
+      where: { code: productData.code },
+    })
+    if (existingCode) throw new AppError('Product code already exists', 400)
+
     const category = await prisma.category.upsert({
       where: { name: categoryName.trim() },
       update: {},
@@ -91,7 +92,18 @@ export const productService = {
   update: async (id: number, data: UpdateProductInput) => {
     await productService.getById(id)
 
-    const { categoryName, ...productData } = data
+    const { categoryName, code, ...productData } = data
+
+    if (code) {
+      const existingCode = await prisma.product.findUnique({ where: { code } })
+      if (existingCode && existingCode.id !== id) {
+        throw new AppError(
+          'Product code already exists in another product',
+          400,
+        )
+      }
+    }
+
     let categoryId: number | undefined
 
     if (categoryName) {
@@ -107,6 +119,7 @@ export const productService = {
       where: { id },
       data: {
         ...productData,
+        ...(code && { code }),
         ...(categoryId && { categoryId }),
       },
       include: { category: true },

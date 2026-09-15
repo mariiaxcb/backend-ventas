@@ -1,11 +1,16 @@
+// src/controllers/stream.controller.ts
 import type { Request, Response, NextFunction } from 'express'
 import { z } from 'zod'
 import { streamService } from '@/services/stream.service'
 import { sendSuccess } from '@/utils/response.util'
-import { AppError } from '@/middlewares/error.middleware'
 
 const createStreamSchema = z.object({
-  title: z.string().min(1, 'Stream title is required'),
+  title: z.string().min(1, 'Title is required'),
+  tiktokUsername: z.string().min(1, 'TikTok Username is required'),
+})
+
+const manageProductSchema = z.object({
+  productCode: z.string().min(1, 'Product code is required'),
 })
 
 export const streamController = {
@@ -20,12 +25,9 @@ export const streamController = {
 
   async getActive(req: Request, res: Response, next: NextFunction) {
     try {
-      const activeStream = await streamService.getActive()
-      return sendSuccess(
-        res,
-        activeStream,
-        'Active stream retrieved successfully',
-      )
+      const stream = await streamService.getActive()
+      if (!stream) return sendSuccess(res, null, 'No active stream found')
+      return sendSuccess(res, stream, 'Active stream retrieved successfully')
     } catch (error) {
       next(error)
     }
@@ -43,11 +45,13 @@ export const streamController = {
 
   async create(req: Request, res: Response, next: NextFunction) {
     try {
-      const adminId = (req as any).user?.id
-      if (!adminId) throw new AppError('Unauthorized', 401)
-
-      const { title } = createStreamSchema.parse(req.body)
-      const stream = await streamService.create({ title, adminId })
+      const { title, tiktokUsername } = createStreamSchema.parse(req.body)
+      const adminId = (req as any).user.id
+      const stream = await streamService.create({
+        title,
+        tiktokUsername,
+        adminId,
+      })
       return sendSuccess(res, stream, 'Live stream started successfully', 201)
     } catch (error) {
       next(error)
@@ -59,6 +63,32 @@ export const streamController = {
       const id = Number(req.params.id)
       const stream = await streamService.endStream(id)
       return sendSuccess(res, stream, 'Live stream ended successfully')
+    } catch (error) {
+      next(error)
+    }
+  },
+
+  async addProduct(req: Request, res: Response, next: NextFunction) {
+    try {
+      const id = Number(req.params.id)
+      const { productCode } = manageProductSchema.parse(req.body)
+      const stream = await streamService.addProduct(id, productCode)
+      return sendSuccess(res, stream, 'Product added to stream successfully')
+    } catch (error) {
+      next(error)
+    }
+  },
+
+  async removeProduct(req: Request, res: Response, next: NextFunction) {
+    try {
+      const id = Number(req.params.id)
+      const productCode = req.params.productCode
+      const stream = await streamService.removeProduct(id, productCode)
+      return sendSuccess(
+        res,
+        stream,
+        'Product removed from stream successfully',
+      )
     } catch (error) {
       next(error)
     }

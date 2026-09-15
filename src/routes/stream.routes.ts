@@ -28,13 +28,15 @@ router.use(verificarToken)
  *             type: object
  *             required:
  *               - title
+ *               - tiktokUsername
  *             properties:
  *               title:
  *                 type: string
- *                 example: Gran Venta Nocturna TikTok
+ *               tiktokUsername:
+ *                 type: string
  *     responses:
  *       201:
- *         description: Transmisión iniciada exitosamente
+ *         description: Transmisión iniciada
  */
 router.get('/', streamController.list)
 router.post('/', streamController.create)
@@ -43,7 +45,7 @@ router.post('/', streamController.create)
  * @openapi
  * /streams/active:
  *   get:
- *     summary: Obtener la transmisión en vivo activa
+ *     summary: Obtener la transmisión activa
  *     tags:
  *       - Streams
  *     responses:
@@ -75,7 +77,7 @@ router.get('/:id', streamController.getById)
  * @openapi
  * /streams/{id}/end:
  *   put:
- *     summary: Finalizar una transmisión en vivo
+ *     summary: Finalizar una transmisión
  *     tags:
  *       - Streams
  *     parameters:
@@ -89,5 +91,59 @@ router.get('/:id', streamController.getById)
  *         description: Transmisión finalizada exitosamente
  */
 router.put('/:id/end', streamController.endStream)
+
+/**
+ * @openapi
+ * /streams/{id}/products:
+ *   post:
+ *     summary: Agregar un producto a una transmisión en vivo
+ *     tags:
+ *       - Streams
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - productCode
+ *             properties:
+ *               productCode:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Producto agregado
+ */
+router.post('/:id/products', streamController.addProduct)
+
+/**
+ * @openapi
+ * /streams/{id}/products/{productCode}:
+ *   delete:
+ *     summary: Remover un producto de una transmisión en vivo
+ *     tags:
+ *       - Streams
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *       - in: path
+ *         name: productCode
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Producto removido
+ */
+router.delete('/:id/products/:productCode', streamController.removeProduct)
 
 export default router

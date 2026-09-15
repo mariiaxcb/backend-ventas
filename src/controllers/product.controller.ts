@@ -5,6 +5,7 @@ import { sendSuccess } from '@/utils/response.util'
 import { ProductStatus } from '@prisma/client'
 
 const productSchema = z.object({
+  code: z.string().min(1, 'Code is required'),
   name: z.string().min(1, 'Name is required'),
   description: z.string().optional(),
   price: z.number().positive('Price must be positive'),
@@ -63,6 +64,7 @@ export const productController = {
         price: req.body.price ? Number(req.body.price) : undefined,
         stock: req.body.stock ? Number(req.body.stock) : undefined,
         categoryName: req.body.categoryName,
+        code: req.body.code,
         ...(req.file && { imageUrl: req.file.path }),
       }
 
@@ -85,6 +87,7 @@ export const productController = {
           categoryName: req.body.categoryName,
         }),
         ...(req.body.status !== undefined && { status: req.body.status }),
+        ...(req.body.code !== undefined && { code: req.body.code }),
         ...(req.file && { imageUrl: req.file.path }),
       }
 
