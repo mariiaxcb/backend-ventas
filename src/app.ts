@@ -36,7 +36,7 @@ app.use('/webhooks', webhookRoutes)
 app.use(notFoundHandler)
 app.use(errorHandler)
 
-inicializarSocket(server)
+app.set('io', inicializarSocket(server))
 
 async function bootstrap() {
   await conectarBaseDatos()
