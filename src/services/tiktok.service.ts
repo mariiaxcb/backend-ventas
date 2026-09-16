@@ -102,8 +102,9 @@ export class TikTokLiveConnectorService {
             // Emitir a la sala de Socket.io
             this.ioSocket.to(sala).emit('nueva_intencion_compra', ventaDetectada);
             
-            // EMISIÓN DE RESPALDO: Emitir globalmente por si el cliente no está en la sala
-            this.ioSocket.emit('nueva_intencion_compra', ventaDetectada);
+            // EMISIÓN DE RESPALDO: emitir a los clientes que NO estén en la sala
+            // (así un cliente de la sala solo recibe el evento una vez)
+            this.ioSocket.except(sala).emit('nueva_intencion_compra', ventaDetectada);
           }
         }
       });
