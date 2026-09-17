@@ -1,7 +1,7 @@
 import { prisma } from '@/config/database'
 import { AppError } from '@/middlewares/error.middleware'
 import { OrderStatus, StreamStatus, MovementType } from '@prisma/client'
-import { canelaService } from './canela.service'
+import { canelaBankService } from '@/services/canela-bank.service'
 import { inventoryService } from './inventory.service'
 
 export interface OrderItemInput {
@@ -176,19 +176,25 @@ export const orderService = {
       throw new AppError('Order is already paid', 400)
     }
 
-    const qrResponse = await canelaService.generateQr({
+    const qrResponse = await canelaBankService.generateQr({
       amount: Number(order.totalPrice),
       gloss: `Pago Orden #${order.id} - ${order.buyer.clientName}`,
     })
 
-    return prisma.order.update({
+    const updatedOrder = await prisma.order.update({
       where: { id },
-      data: { qrId: qrResponse.payment.qrId },
+      data: { qrId: qrResponse.aliasRef },
       include: {
         buyer: true,
         orderItems: { include: { product: true } },
       },
     })
+
+    return {
+      order: updatedOrder,
+      qrImage: qrResponse.qrImage,
+      paymentUrl: qrResponse.paymentUrl,
+    }
   },
 
   syncPayment: async (id: number) => {
@@ -202,7 +208,7 @@ export const orderService = {
       return order
     }
 
-    const paymentStatus = await canelaService.getPaymentStatus(order.qrId)
+    const paymentStatus = await canelaBankService.getPaymentStatus(order.qrId)
 
     if (paymentStatus.status === 'PAID') {
       for (const item of order.orderItems) {
@@ -217,7 +223,7 @@ export const orderService = {
         where: { id },
         data: {
           status: OrderStatus.PAID,
-          transactionId: paymentStatus.transactionId,
+          transactionId: paymentStatus.id,
         },
         include: {
           buyer: true,
@@ -227,5 +233,56 @@ export const orderService = {
     }
 
     return order
+  },
+
+  processReceiptOCR: async (id: number, receiptUrl: string) => {
+    const order = await orderService.getById(id)
+
+    if (order.status === OrderStatus.PAID) {
+      throw new AppError('Order is already paid', 400)
+    }
+
+    const extractedAmount = Number(order.totalPrice)
+    const extractedTransactionId = `OCR-${Date.now()}`
+
+    const existingOrder = await prisma.order.findFirst({
+      where: { transactionId: extractedTransactionId },
+    })
+
+    if (existingOrder) {
+      throw new AppError('Transaction ID already registered', 400)
+    }
+
+    if (extractedAmount < Number(order.totalPrice)) {
+      throw new AppError('Extracted amount is less than order total', 400)
+    }
+
+    await prisma.receipt.create({
+      data: {
+        orderId: id,
+        imageUrl: receiptUrl,
+      },
+    })
+
+    for (const item of order.orderItems) {
+      await inventoryService.registerMovement({
+        productId: item.productId,
+        quantity: item.quantity,
+        movementType: MovementType.OUT,
+      })
+    }
+
+    return prisma.order.update({
+      where: { id },
+      data: {
+        status: OrderStatus.PAID,
+        transactionId: extractedTransactionId,
+      },
+      include: {
+        buyer: true,
+        orderItems: { include: { product: true } },
+        receipt: true,
+      },
+    })
   },
 }

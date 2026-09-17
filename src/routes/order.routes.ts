@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { orderController } from '@/controllers/order.controller'
 import { verificarToken } from '@/middlewares/auth.middleware'
+import upload from '@/middlewares/upload.middleware'
 
 const router = Router()
 
@@ -166,5 +167,40 @@ router.post('/:id/generate-qr', orderController.generateQr)
  *         description: Sincronización completa (Actualiza inventario y estado si el pago fue exitoso)
  */
 router.post('/:id/sync-payment', orderController.syncPayment)
+
+/**
+ * @openapi
+ * /orders/{id}/receipt:
+ *   post:
+ *     summary: Subir comprobante de pago y procesar validación para la orden
+ *     tags:
+ *       - Orders
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - image
+ *             properties:
+ *               image:
+ *                 type: string
+ *                 format: binary
+ *     responses:
+ *       200:
+ *         description: Comprobante subido y orden procesada exitosamente
+ */
+router.post(
+  '/:id/receipt',
+  upload.single('image'),
+  orderController.uploadReceipt,
+)
 
 export default router

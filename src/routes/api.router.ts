@@ -10,6 +10,7 @@ import dashboardRoutes from './dashboard.routes'
 import buyerRoutes from './buyer.routes'
 import reservationRoutes from './reservation.routes'
 import tiktokRoutes from './tiktok.routes'
+import webhookRoutes from '@/routes/webhook.routes'
 
 const apiRouter = Router()
 
@@ -24,4 +25,5 @@ apiRouter.use('/dashboard', dashboardRoutes)
 apiRouter.use('/buyers', buyerRoutes)
 apiRouter.use('/reservations', reservationRoutes)
 apiRouter.use('/tiktok', tiktokRoutes)
+apiRouter.use('/webhooks', webhookRoutes)
 export default apiRouter

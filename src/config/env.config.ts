@@ -1,16 +1,18 @@
-import "dotenv/config";
-import { z } from "zod";
+import 'dotenv/config'
+import { z } from 'zod'
 
 const envSchema = z.object({
-  PORT: z.string().default("8080"),
-  NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
-  JWT_SECRET: z.string().min(1, "JWT_SECRET es requerido"),
-  JWT_EXPIRES_IN: z.string().default("1d"),
+  PORT: z.string().default('8080'),
+  NODE_ENV: z
+    .enum(['development', 'production', 'test'])
+    .default('development'),
+  JWT_SECRET: z.string().min(1, 'JWT_SECRET es requerido'),
+  JWT_EXPIRES_IN: z.string().default('1d'),
 
-  DATABASE_URL: z.string().min(1, "DATABASE_URL es requerido"),
+  DATABASE_URL: z.string().min(1, 'DATABASE_URL es requerido'),
 
-  REDIS_HOST: z.string().default("localhost"),
-  REDIS_PORT: z.string().default("6379"),
+  REDIS_HOST: z.string().default('localhost'),
+  REDIS_PORT: z.string().default('6379'),
   REDIS_PASSWORD: z.string().optional(),
 
   WHATSAPP_TOKEN: z.string().optional(),
@@ -20,25 +22,35 @@ const envSchema = z.object({
 
   SUPABASE_URL: z.string().optional(),
   SUPABASE_SERVICE_ROLE_KEY: z.string().optional(),
-  SUPABASE_BUCKET: z.string().default("comprobantes"),
+  SUPABASE_BUCKET: z.string().default('comprobantes'),
 
   CLOUDINARY_CLOUD_NAME: z.string().optional(),
   CLOUDINARY_API_KEY: z.string().optional(),
   CLOUDINARY_API_SECRET: z.string().optional(),
 
-  FRONTEND_URL: z.string().default("http://localhost:3000"),
+  FRONTEND_URL: z.string().default('http://localhost:3000'),
 
-  BNB_API_BASE_URL: z.string().default("https://api.bnb.com.bo"),
+  BNB_API_BASE_URL: z.string().default('https://api.bnb.com.bo'),
   BNB_API_KEY: z.string().optional(),
   BNB_ACCOUNT_ID: z.string().optional(),
   BNB_MERCHANT_ID: z.string().optional(),
-});
 
-const parsed = envSchema.safeParse(process.env);
+  CANELA_BANK_API_URL: z.string().min(1, 'CANELA_BANK_API_URL es requerido'),
+  CANELA_BANK_API_KEY: z.string().min(1, 'CANELA_BANK_API_KEY es requerido'),
+  CANELA_WEBHOOK_SECRET: z
+    .string()
+    .min(1, 'CANELA_WEBHOOK_SECRET es requerido'),
+  APP_BASE_URL: z.string().min(1, 'APP_BASE_URL es requerido'),
+})
+
+const parsed = envSchema.safeParse(process.env)
 
 if (!parsed.success) {
-  console.error("❌ Variables de entorno inválidas:", parsed.error.flatten().fieldErrors);
-  throw new Error("Configuración de entorno inválida");
+  console.error(
+    '❌ Variables de entorno inválidas:',
+    parsed.error.flatten().fieldErrors,
+  )
+  throw new Error('Configuración de entorno inválida')
 }
 
-export const env = parsed.data;
+export const env = parsed.data

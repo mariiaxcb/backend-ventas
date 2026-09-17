@@ -46,7 +46,7 @@ export const streamController = {
   async create(req: Request, res: Response, next: NextFunction) {
     try {
       const { title, tiktokUsername } = createStreamSchema.parse(req.body)
-      const adminId = (req as any).user.id
+      const adminId = Number((req as any).usuario.id)
       const stream = await streamService.create({
         title,
         tiktokUsername,

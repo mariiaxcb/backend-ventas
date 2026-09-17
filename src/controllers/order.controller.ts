@@ -3,20 +3,22 @@ import { z } from 'zod'
 import { orderService } from '@/services/order.service'
 import { sendSuccess } from '@/utils/response.util'
 import { OrderStatus } from '@prisma/client'
+import { v2 as cloudinary } from 'cloudinary'
+import fs from 'fs'
 
 const createOrderSchema = z.object({
-  clientName: z.string().min(1, 'Client name is required'),
-  whatsapp: z.string().min(1, 'WhatsApp number is required'),
+  clientName: z.string().min(1),
+  whatsapp: z.string().min(1),
   tiktokUsername: z.string().optional(),
   streamId: z.number().int().positive().optional(),
   items: z
     .array(
       z.object({
-        productId: z.number().int().positive('Product ID is required'),
-        quantity: z.number().int().positive('Quantity must be greater than 0'),
+        productId: z.number().int().positive(),
+        quantity: z.number().int().positive(),
       }),
     )
-    .min(1, 'At least one product item is required'),
+    .min(1),
 })
 
 const listOrdersQuerySchema = z.object({
@@ -34,7 +36,7 @@ export const orderController = {
     try {
       const filters = listOrdersQuerySchema.parse(req.query)
       const orders = await orderService.list(filters)
-      return sendSuccess(res, orders, 'Orders retrieved successfully')
+      return sendSuccess(res, orders)
     } catch (error) {
       next(error)
     }
@@ -44,7 +46,7 @@ export const orderController = {
     try {
       const id = Number(req.params.id)
       const order = await orderService.getById(id)
-      return sendSuccess(res, order, 'Order retrieved successfully')
+      return sendSuccess(res, order)
     } catch (error) {
       next(error)
     }
@@ -54,7 +56,7 @@ export const orderController = {
     try {
       const input = createOrderSchema.parse(req.body)
       const order = await orderService.create(input)
-      return sendSuccess(res, order, 'Order created successfully', 201)
+      return sendSuccess(res, order, undefined, 201)
     } catch (error) {
       next(error)
     }
@@ -65,7 +67,7 @@ export const orderController = {
       const id = Number(req.params.id)
       const { status } = updateStatusSchema.parse(req.body)
       const order = await orderService.updateStatus(id, status)
-      return sendSuccess(res, order, 'Order status updated successfully')
+      return sendSuccess(res, order)
     } catch (error) {
       next(error)
     }
@@ -75,7 +77,7 @@ export const orderController = {
     try {
       const id = Number(req.params.id)
       const order = await orderService.generateQr(id)
-      return sendSuccess(res, order, 'QR generated and assigned successfully')
+      return sendSuccess(res, order)
     } catch (error) {
       next(error)
     }
@@ -85,8 +87,38 @@ export const orderController = {
     try {
       const id = Number(req.params.id)
       const order = await orderService.syncPayment(id)
-      return sendSuccess(res, order, 'Order payment synchronized successfully')
+      return sendSuccess(res, order)
     } catch (error) {
+      next(error)
+    }
+  },
+
+  async uploadReceipt(req: Request, res: Response, next: NextFunction) {
+    try {
+      const id = Number(req.params.id)
+
+      if (!req.file) {
+        return res
+          .status(400)
+          .json({ success: false, message: 'Receipt image is required' })
+      }
+
+      const result = await cloudinary.uploader.upload(req.file.path, {
+        folder: 'tiktok-live-receipts',
+      })
+      const receiptUrl = result.secure_url
+
+      if (fs.existsSync(req.file.path)) {
+        fs.unlinkSync(req.file.path)
+      }
+
+      const order = await orderService.processReceiptOCR(id, receiptUrl)
+
+      return sendSuccess(res, order)
+    } catch (error) {
+      if (req.file && fs.existsSync(req.file.path)) {
+        fs.unlinkSync(req.file.path)
+      }
       next(error)
     }
   },
