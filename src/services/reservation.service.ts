@@ -34,7 +34,6 @@ export const reservationService = {
       data: {
         tiktokUsername: data.tiktokUsername.trim(),
         productCode: data.productCode.trim(),
-        comment: data.comment?.trim(),
         timestamp: new Date(data.timestamp),
         streamId: activeStream.id,
         productId: product.id,
@@ -51,7 +50,14 @@ export const reservationService = {
       where: { streamId },
       include: {
         product: {
-          select: { id: true, code: true, name: true, stock: true, price: true, imageUrl: true },
+          select: {
+            id: true,
+            code: true,
+            name: true,
+            stock: true,
+            price: true,
+            imageUrl: true,
+          },
         },
       },
       orderBy: { timestamp: 'asc' },
