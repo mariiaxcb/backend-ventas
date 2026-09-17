@@ -6,8 +6,14 @@ export interface TiktokComentarioEvento {
 
 export interface TiktokPostulanteEvento {
   usuarioTiktok: string;
+  nickname?: string;
   productoId: string;
+  productoNombre?: string;
+  comentario?: string;
   timestamp: string;
+  reservados?: number;
+  limite?: number;
+  stock?: number;
 }
 
 export interface TiktokLiveConfig {

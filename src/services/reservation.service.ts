@@ -6,6 +6,7 @@ export interface CreateReservationInput {
   tiktokUsername: string
   productCode: string
   timestamp: string | Date
+  comment?: string
 }
 
 export const reservationService = {
@@ -33,6 +34,7 @@ export const reservationService = {
       data: {
         tiktokUsername: data.tiktokUsername.trim(),
         productCode: data.productCode.trim(),
+        comment: data.comment?.trim(),
         timestamp: new Date(data.timestamp),
         streamId: activeStream.id,
         productId: product.id,
@@ -41,6 +43,18 @@ export const reservationService = {
         product: true,
         stream: true,
       },
+    })
+  },
+
+  listByStream: (streamId: number) => {
+    return prisma.reservation.findMany({
+      where: { streamId },
+      include: {
+        product: {
+          select: { id: true, code: true, name: true, stock: true, price: true, imageUrl: true },
+        },
+      },
+      orderBy: { timestamp: 'asc' },
     })
   },
 }

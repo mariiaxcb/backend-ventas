@@ -164,6 +164,7 @@ model Reservation {
   id             Int      @id @default(autoincrement())
   tiktokUsername String   @db.VarChar(100)
   productCode    String   @db.VarChar(50)
+  comment        String?  @db.Text
   timestamp      DateTime
   streamId       Int
   stream         Stream   @relation(fields: [streamId], references: [id])

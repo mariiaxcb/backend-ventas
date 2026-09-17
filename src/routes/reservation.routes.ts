@@ -40,4 +40,23 @@ router.use(verificarToken)
  */
 router.post('/', reservationController.create)
 
+/**
+ * @openapi
+ * /reservations/stream/{streamId}:
+ *   get:
+ *     summary: Listar las reservas (compradores) de una transmisión
+ *     tags:
+ *       - Reservations
+ *     parameters:
+ *       - in: path
+ *         name: streamId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Reservas de la transmisión
+ */
+router.get('/stream/:streamId', reservationController.listByStream)
+
 export default router

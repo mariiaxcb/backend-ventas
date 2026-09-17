@@ -7,6 +7,7 @@ const createReservationSchema = z.object({
   tiktokUsername: z.string().min(1, 'TikTok username is required'),
   productCode: z.string().min(1, 'Product code is required'),
   timestamp: z.union([z.string(), z.date()]),
+  comment: z.string().optional(),
 })
 
 export const reservationController = {
@@ -20,6 +21,16 @@ export const reservationController = {
         'Reservation registered successfully',
         201,
       )
+    } catch (error) {
+      next(error)
+    }
+  },
+
+  async listByStream(req: Request, res: Response, next: NextFunction) {
+    try {
+      const streamId = Number(req.params.streamId)
+      const reservations = await reservationService.listByStream(streamId)
+      return sendSuccess(res, reservations, 'Reservations retrieved successfully')
     } catch (error) {
       next(error)
     }
