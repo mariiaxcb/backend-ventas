@@ -26,11 +26,14 @@ export const reservationController = {
     }
   },
 
-  async listByStream(req: Request, res: Response, next: NextFunction) {
+  async listByActiveStream(_req: Request, res: Response, next: NextFunction) {
     try {
-      const streamId = Number(req.params.streamId)
-      const reservations = await reservationService.listByStream(streamId)
-      return sendSuccess(res, reservations, 'Reservations retrieved successfully')
+      const reservations = await reservationService.listByActiveStream()
+      return sendSuccess(
+        res,
+        reservations,
+        'Reservations retrieved successfully',
+      )
     } catch (error) {
       next(error)
     }

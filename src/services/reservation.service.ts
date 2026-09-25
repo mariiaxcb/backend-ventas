@@ -34,7 +34,6 @@ export const reservationService = {
       data: {
         tiktokUsername: data.tiktokUsername.trim(),
         productCode: data.productCode.trim(),
-        comment: data.comment?.trim(),
         timestamp: new Date(data.timestamp),
         streamId: activeStream.id,
         productId: product.id,
@@ -46,12 +45,27 @@ export const reservationService = {
     })
   },
 
-  listByStream: (streamId: number) => {
+  listByActiveStream: async () => {
+    const activeStream = await prisma.stream.findFirst({
+      where: { status: StreamStatus.LIVE },
+    })
+
+    if (!activeStream) {
+      throw new AppError('No active live stream found', 404)
+    }
+
     return prisma.reservation.findMany({
-      where: { streamId },
+      where: { streamId: activeStream.id },
       include: {
         product: {
-          select: { id: true, code: true, name: true, stock: true, price: true, imageUrl: true },
+          select: {
+            id: true,
+            code: true,
+            name: true,
+            stock: true,
+            price: true,
+            imageUrl: true,
+          },
         },
       },
       orderBy: { timestamp: 'asc' },

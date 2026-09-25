@@ -42,21 +42,17 @@ router.post('/', reservationController.create)
 
 /**
  * @openapi
- * /reservations/stream/{streamId}:
+ * /reservations/active:
  *   get:
- *     summary: Listar las reservas (compradores) de una transmisión
+ *     summary: Listar las reservas del stream activo actualmente
  *     tags:
  *       - Reservations
- *     parameters:
- *       - in: path
- *         name: streamId
- *         required: true
- *         schema:
- *           type: integer
  *     responses:
  *       200:
- *         description: Reservas de la transmisión
+ *         description: Reservas de la transmisión activa
+ *       404:
+ *         description: No hay ningún stream activo actualmente
  */
-router.get('/stream/:streamId', reservationController.listByStream)
+router.get('/active', reservationController.listByActiveStream)
 
 export default router
