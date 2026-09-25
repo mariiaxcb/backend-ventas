@@ -30,7 +30,7 @@ router.use(verificarToken)
  *           type: integer
  *     responses:
  *       200:
- *         description: Lista de pedidos
+ *         description: Lista de pedidos obtenida exitosamente
  *   post:
  *     summary: Crear un nuevo pedido
  *     tags:
@@ -48,13 +48,13 @@ router.use(verificarToken)
  *             properties:
  *               clientName:
  *                 type: string
- *                 example: Juan Perez
+ *                 example: "Juan Perez"
  *               whatsapp:
  *                 type: string
  *                 example: "+59178912345"
  *               tiktokUsername:
  *                 type: string
- *                 example: juanperez_live
+ *                 example: "juanperez_live"
  *               streamId:
  *                 type: integer
  *                 example: 1
@@ -68,13 +68,63 @@ router.use(verificarToken)
  *                   properties:
  *                     productId:
  *                       type: integer
- *                       example: 1
+ *                       example: 2
  *                     quantity:
  *                       type: integer
- *                       example: 2
+ *                       example: 1
  *     responses:
  *       201:
  *         description: Pedido registrado exitosamente
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: integer
+ *                       example: 15
+ *                     totalPrice:
+ *                       type: string
+ *                       example: "180.00"
+ *                     status:
+ *                       type: string
+ *                       example: "PENDING"
+ *                     buyerId:
+ *                       type: integer
+ *                       example: 3
+ *                     streamId:
+ *                       type: integer
+ *                       example: 1
+ *                     buyer:
+ *                       type: object
+ *                       properties:
+ *                         id:
+ *                           type: integer
+ *                         clientName:
+ *                           type: string
+ *                         whatsapp:
+ *                           type: string
+ *                         tiktokUsername:
+ *                           type: string
+ *                     orderItems:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           id:
+ *                             type: integer
+ *                           productId:
+ *                             type: integer
+ *                           quantity:
+ *                             type: integer
+ *                           unitPrice:
+ *                             type: string
  */
 router.get('/', orderController.list)
 router.post('/', orderController.create)
@@ -146,6 +196,29 @@ router.patch('/:id/status', orderController.updateStatus)
  *     responses:
  *       200:
  *         description: QR generado y asignado a la orden
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     qrImage:
+ *                       type: string
+ *                       example: "data:image/png;base64,iVBORw0KGgoAAA..."
+ *                     qrUrl:
+ *                       type: string
+ *                       example: "https://bank.canela.dev/pay/tx_123"
+ *                     transactionId:
+ *                       type: string
+ *                       example: "tx_123"
+ *                     amount:
+ *                       type: string
+ *                       example: "180.00"
  */
 router.post('/:id/generate-qr', orderController.generateQr)
 
@@ -153,7 +226,7 @@ router.post('/:id/generate-qr', orderController.generateQr)
  * @openapi
  * /orders/{id}/sync-payment:
  *   post:
- *     summary: Sincronizar el estado del pago con Canela API Bank (valida si se pagó el QR)
+ *     summary: Sincronizar el estado del pago con Canela API Bank
  *     tags:
  *       - Orders
  *     parameters:
@@ -164,7 +237,7 @@ router.post('/:id/generate-qr', orderController.generateQr)
  *           type: integer
  *     responses:
  *       200:
- *         description: Sincronización completa (Actualiza inventario y estado si el pago fue exitoso)
+ *         description: Sincronización completa
  */
 router.post('/:id/sync-payment', orderController.syncPayment)
 
