@@ -3,6 +3,7 @@ import { AppError } from '@/middlewares/error.middleware'
 import { OrderStatus, StreamStatus, MovementType } from '@prisma/client'
 import { canelaBankService } from '@/services/canela-bank.service'
 import { inventoryService } from './inventory.service'
+import { v2 as cloudinary } from 'cloudinary'
 
 export interface OrderItemInput {
   productId: number
@@ -181,6 +182,10 @@ export const orderService = {
       gloss: `Pago Orden #${order.id} - ${order.buyer.clientName}`,
     })
 
+    const uploadResult = await cloudinary.uploader.upload(qrResponse.qrImage, {
+      folder: 'tiktok-live-sales/qrs',
+    })
+
     const updatedOrder = await prisma.order.update({
       where: { id },
       data: { qrId: qrResponse.aliasRef },
@@ -192,8 +197,8 @@ export const orderService = {
 
     return {
       order: updatedOrder,
-      qrImage: qrResponse.qrImage,
-      paymentUrl: qrResponse.paymentUrl,
+      qrImageUrl: uploadResult.secure_url,
+      qrUrl: qrResponse.paymentUrl,
     }
   },
 
