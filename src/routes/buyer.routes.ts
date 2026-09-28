@@ -43,4 +43,36 @@ router.get('/', buyerController.list)
  */
 router.get('/:id', buyerController.getById)
 
+/**
+ * @openapi
+ * /buyers/{id}:
+ *   put:
+ *     summary: Actualizar información de un comprador
+ *     tags:
+ *       - Buyers
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               clientName:
+ *                 type: string
+ *               whatsapp:
+ *                 type: string
+ *               tiktokUsername:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Comprador actualizado exitosamente
+ */
+router.put('/:id', buyerController.update)
+
 export default router

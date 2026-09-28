@@ -48,4 +48,18 @@ export const buyerService = {
 
     return buyer
   },
+
+  update: async (
+    id: number,
+    data: { clientName?: string; whatsapp?: string; tiktokUsername?: string },
+  ) => {
+    const buyer = await prisma.buyer.findUnique({ where: { id } })
+    if (!buyer) {
+      throw new AppError('Comprador no encontrado', 404)
+    }
+    return prisma.buyer.update({
+      where: { id },
+      data,
+    })
+  },
 }

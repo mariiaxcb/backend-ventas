@@ -27,4 +27,15 @@ export const buyerController = {
       next(error)
     }
   },
+
+  update: async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const id = Number(req.params.id)
+      const data = req.body
+      const updatedBuyer = await buyerService.update(id, data)
+      res.json({ data: updatedBuyer })
+    } catch (error) {
+      next(error)
+    }
+  },
 }
