@@ -283,18 +283,44 @@ Analiza la imagen del comprobante y extrae:
 Devuelve ÚNICAMENTE un JSON con esta estructura estricta, sin formato markdown ni texto adicional:
 { "monto": 150.50, "referencia": "texto_extraido" }`
 
-    const aiResponse = await ai.models.generateContent({
-      model: 'gemini-1.5-flash',
-      contents: [
-        {
-          role: 'user',
-          parts: [
-            { inlineData: { data: base64Image, mimeType } },
-            { text: prompt },
+    let aiResponse: any = null
+    let attempts = 0
+    const maxAttempts = 3
+
+    while (attempts < maxAttempts) {
+      try {
+        attempts++
+        aiResponse = await ai.models.generateContent({
+          model: 'gemini-3.8-flash',
+          contents: [
+            {
+              role: 'user',
+              parts: [
+                { inlineData: { data: base64Image, mimeType } },
+                { text: prompt },
+              ],
+            },
           ],
-        },
-      ],
-    })
+        })
+        break
+      } catch (aiError: any) {
+        console.error(
+          `Intento ${attempts} fallido en Gemini API:`,
+          aiError.message,
+        )
+        if (attempts >= maxAttempts) {
+          console.error(
+            'ERROR CRITICO EN GEMINI API (Agotados los reintentos):',
+            aiError,
+          )
+          throw new AppError(
+            `Error comunicándose con la IA: ${aiError.message || 'Desconocido'}`,
+            503,
+          )
+        }
+        await new Promise((resolve) => setTimeout(resolve, 2000))
+      }
+    }
 
     const rawText = aiResponse.text || '{}'
     const cleanJson = rawText

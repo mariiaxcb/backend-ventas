@@ -1,14 +1,14 @@
-import { PrismaClient } from "@prisma/client";
-import { env } from "./env.config";
+import { PrismaClient } from '@prisma/client'
+import { env } from './env.config'
 
 export const prisma = new PrismaClient({
-  log: env.NODE_ENV === "development" ? ["query", "warn", "error"] : ["warn", "error"],
-});
+  log: ['error', 'warn'],
+})
 
 export async function conectarBaseDatos() {
-  await prisma.$connect();
+  await prisma.$connect()
 }
 
 export async function desconectarBaseDatos() {
-  await prisma.$disconnect();
+  await prisma.$disconnect()
 }
