@@ -15,6 +15,7 @@
     "seed": "ts-node src/config/seed.ts"
   },
   "dependencies": {
+    "@google/genai": "^2.24.0",
     "@prisma/client": "^5.17.0",
     "axios": "^1.7.2",
     "bcryptjs": "^2.4.3",

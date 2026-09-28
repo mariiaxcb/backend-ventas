@@ -55,7 +55,7 @@ export const reservationService = {
     }
 
     return prisma.reservation.findMany({
-      where: { streamId: activeStream.id },
+      where: { streamId: activeStream.id, status: 'PENDING' },
       include: {
         product: {
           select: {

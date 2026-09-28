@@ -4,6 +4,7 @@ import { OrderStatus, StreamStatus, MovementType } from '@prisma/client'
 import { canelaBankService } from '@/services/canela-bank.service'
 import { inventoryService } from './inventory.service'
 import { v2 as cloudinary } from 'cloudinary'
+import { GoogleGenAI } from '@google/genai'
 
 export interface OrderItemInput {
   productId: number
@@ -123,8 +124,7 @@ export const orderService = {
         )
       }
 
-      const itemTotal = Number(product.price) * item.quantity
-      calculatedTotal += itemTotal
+      calculatedTotal += Number(product.price) * item.quantity
 
       return {
         productId: product.id,
@@ -133,7 +133,7 @@ export const orderService = {
       }
     })
 
-    return prisma.order.create({
+    const order = await prisma.order.create({
       data: {
         buyerId: buyer.id,
         streamId: targetStreamId,
@@ -146,11 +146,31 @@ export const orderService = {
       include: {
         buyer: true,
         stream: true,
-        orderItems: {
-          include: { product: true },
-        },
+        orderItems: { include: { product: true } },
       },
     })
+
+    if (tiktokUsername) {
+      for (const item of items) {
+        const pendingRes = await prisma.reservation.findFirst({
+          where: {
+            streamId: targetStreamId,
+            tiktokUsername: tiktokUsername.trim(),
+            productId: item.productId,
+            status: 'PENDING',
+          },
+        })
+
+        if (pendingRes) {
+          await prisma.reservation.update({
+            where: { id: pendingRes.id },
+            data: { status: 'CLAIMED', orderId: order.id },
+          })
+        }
+      }
+    }
+
+    return order
   },
 
   updateStatus: async (id: number, status: OrderStatus) => {
@@ -162,9 +182,7 @@ export const orderService = {
       include: {
         buyer: true,
         stream: true,
-        orderItems: {
-          include: { product: true },
-        },
+        orderItems: { include: { product: true } },
         receipt: true,
       },
     })
@@ -177,9 +195,11 @@ export const orderService = {
       throw new AppError('Order is already paid', 400)
     }
 
+    const expectedGloss = `Pago Orden #${order.id} - ${order.buyer.clientName}`
+
     const qrResponse = await canelaBankService.generateQr({
       amount: Number(order.totalPrice),
-      gloss: `Pago Orden #${order.id} - ${order.buyer.clientName}`,
+      gloss: expectedGloss,
     })
 
     const uploadResult = await cloudinary.uploader.upload(qrResponse.qrImage, {
@@ -188,7 +208,10 @@ export const orderService = {
 
     const updatedOrder = await prisma.order.update({
       where: { id },
-      data: { qrId: qrResponse.aliasRef },
+      data: {
+        qrId: qrResponse.aliasRef,
+        transactionId: expectedGloss,
+      },
       include: {
         buyer: true,
         orderItems: { include: { product: true } },
@@ -204,14 +227,9 @@ export const orderService = {
 
   syncPayment: async (id: number) => {
     const order = await orderService.getById(id)
-
-    if (!order.qrId) {
+    if (!order.qrId)
       throw new AppError('Order does not have a generated QR', 400)
-    }
-
-    if (order.status === OrderStatus.PAID) {
-      return order
-    }
+    if (order.status === OrderStatus.PAID) return order
 
     const paymentStatus = await canelaBankService.getPaymentStatus(order.qrId)
 
@@ -226,10 +244,7 @@ export const orderService = {
 
       return prisma.order.update({
         where: { id },
-        data: {
-          status: OrderStatus.PAID,
-          transactionId: paymentStatus.id,
-        },
+        data: { status: OrderStatus.PAID },
         include: {
           buyer: true,
           orderItems: { include: { product: true } },
@@ -244,28 +259,89 @@ export const orderService = {
     const order = await orderService.getById(id)
 
     if (order.status === OrderStatus.PAID) {
-      throw new AppError('Order is already paid', 400)
+      throw new AppError('La orden ya ha sido pagada y validada.', 400)
     }
 
-    const extractedAmount = Number(order.totalPrice)
-    const extractedTransactionId = `OCR-${Date.now()}`
+    if (!process.env.GEMINI_API_KEY) {
+      throw new AppError(
+        'El motor de validacion OCR (Gemini) no esta configurado.',
+        500,
+      )
+    }
 
-    const existingOrder = await prisma.order.findFirst({
-      where: { transactionId: extractedTransactionId },
+    const imageRes = await fetch(receiptUrl)
+    const imageBuffer = await imageRes.arrayBuffer()
+    const base64Image = Buffer.from(imageBuffer).toString('base64')
+    const mimeType = imageRes.headers.get('content-type') || 'image/jpeg'
+
+    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY })
+    const prompt = `Eres un validador de transferencias bancarias de Bolivia.
+Analiza la imagen del comprobante y extrae:
+1. El monto total pagado (solo el número, sin letras ni símbolos de moneda).
+2. El Motivo, Referencia, Glosa o Detalle (el texto exacto introducido por el cliente).
+
+Devuelve ÚNICAMENTE un JSON con esta estructura estricta, sin formato markdown ni texto adicional:
+{ "monto": 150.50, "referencia": "texto_extraido" }`
+
+    const aiResponse = await ai.models.generateContent({
+      model: 'gemini-1.5-flash',
+      contents: [
+        {
+          role: 'user',
+          parts: [
+            { inlineData: { data: base64Image, mimeType } },
+            { text: prompt },
+          ],
+        },
+      ],
     })
 
-    if (existingOrder) {
-      throw new AppError('Transaction ID already registered', 400)
+    const rawText = aiResponse.text || '{}'
+    const cleanJson = rawText
+      .replace(/```json/g, '')
+      .replace(/```/g, '')
+      .trim()
+
+    let extractedData
+    try {
+      extractedData = JSON.parse(cleanJson)
+    } catch (error) {
+      throw new AppError(
+        'La IA no pudo procesar el comprobante correctamente por baja legibilidad.',
+        400,
+      )
     }
 
+    const extractedAmount = Number(extractedData.monto)
+    const extractedReference = extractedData.referencia || ''
+
     if (extractedAmount < Number(order.totalPrice)) {
-      throw new AppError('Extracted amount is less than order total', 400)
+      throw new AppError(
+        `Pago rechazado: El monto pagado (Bs. ${extractedAmount}) es menor al total de la orden (Bs. ${order.totalPrice}).`,
+        400,
+      )
+    }
+
+    const expectedGloss = order.transactionId || `Pago Orden #${order.id}`
+    const cleanExpected = expectedGloss.toLowerCase().replace(/\s+/g, '')
+    const cleanExtracted = extractedReference.toLowerCase().replace(/\s+/g, '')
+
+    if (
+      !cleanExtracted.includes(cleanExpected) &&
+      !cleanExpected.includes(cleanExtracted)
+    ) {
+      throw new AppError(
+        `Pago rechazado: La referencia no coincide. Esperada: '${expectedGloss}', Encontrada: '${extractedReference}'.`,
+        400,
+      )
     }
 
     await prisma.receipt.create({
       data: {
         orderId: id,
         imageUrl: receiptUrl,
+        extractedAmount: extractedAmount,
+        validationStatus: 'VALIDATED',
       },
     })
 
@@ -279,10 +355,7 @@ export const orderService = {
 
     return prisma.order.update({
       where: { id },
-      data: {
-        status: OrderStatus.PAID,
-        transactionId: extractedTransactionId,
-      },
+      data: { status: OrderStatus.PAID },
       include: {
         buyer: true,
         orderItems: { include: { product: true } },

@@ -53,6 +53,12 @@ enum GeneralStatus {
   INACTIVE
 }
 
+enum ReservationStatus {
+  PENDING
+  CLAIMED
+  CANCELLED
+}
+
 model Category {
   id       Int           @id @default(autoincrement())
   name     String        @unique @db.VarChar(100)
@@ -131,6 +137,8 @@ model Order {
   orderItems    OrderItem[]
   messages      Message[]
   receipt       Receipt?
+
+  reservation   Reservation?
 }
 
 model OrderItem {
@@ -161,14 +169,17 @@ model Receipt {
 }
 
 model Reservation {
-  id             Int      @id @default(autoincrement())
-  tiktokUsername String   @db.VarChar(100)
-  productCode    String   @db.VarChar(50)
-  comment        String?  @db.Text
+  id             Int               @id @default(autoincrement())
+  tiktokUsername String            @db.VarChar(100)
+  productCode    String            @db.VarChar(50)
+  comment        String?           @db.Text
   timestamp      DateTime
   streamId       Int
-  stream         Stream   @relation(fields: [streamId], references: [id])
+  stream         Stream            @relation(fields: [streamId], references: [id])
   productId      Int
-  product        Product  @relation(fields: [productId], references: [id])
-  createdAt      DateTime @default(now())
+  product        Product           @relation(fields: [productId], references: [id])
+  createdAt      DateTime          @default(now())
+  status         ReservationStatus @default(PENDING)
+  orderId        Int?              @unique
+  order          Order?            @relation(fields: [orderId], references: [id])
 }
