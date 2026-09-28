@@ -4,7 +4,8 @@ import { OrderStatus, StreamStatus, MovementType } from '@prisma/client'
 import { canelaBankService } from '@/services/canela-bank.service'
 import { inventoryService } from './inventory.service'
 import { v2 as cloudinary } from 'cloudinary'
-import { GoogleGenAI } from '@google/genai'
+
+import { createWorker } from 'tesseract.js'
 
 export interface OrderItemInput {
   productId: number
@@ -262,106 +263,71 @@ export const orderService = {
       throw new AppError('La orden ya ha sido pagada y validada.', 400)
     }
 
-    if (!process.env.GEMINI_API_KEY) {
-      throw new AppError(
-        'El motor de validacion OCR (Gemini) no esta configurado.',
-        500,
-      )
-    }
-
+    // 1. Descargar la imagen del comprobante
     const imageRes = await fetch(receiptUrl)
     const imageBuffer = await imageRes.arrayBuffer()
-    const base64Image = Buffer.from(imageBuffer).toString('base64')
-    const mimeType = imageRes.headers.get('content-type') || 'image/jpeg'
+    const buffer = Buffer.from(imageBuffer)
 
-    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY })
-    const prompt = `Eres un validador de transferencias bancarias de Bolivia.
-Analiza la imagen del comprobante y extrae:
-1. El monto total pagado (solo el número, sin letras ni símbolos de moneda).
-2. El Motivo, Referencia, Glosa o Detalle (el texto exacto introducido por el cliente).
+    // 2. Inicializar Tesseract para leer texto en español e inglés
+    const worker = await createWorker('spa+eng')
 
-Devuelve ÚNICAMENTE un JSON con esta estructura estricta, sin formato markdown ni texto adicional:
-{ "monto": 150.50, "referencia": "texto_extraido" }`
+    let recognizedText = ''
+    try {
+      const ret = await worker.recognize(buffer)
+      recognizedText = ret.data.text
+    } catch (ocrError: any) {
+      console.error('ERROR EN TESSERACT OCR:', ocrError)
+      throw new AppError('No se pudo leer la imagen del comprobante.', 400)
+    } finally {
+      await worker.terminate()
+    }
 
-    let aiResponse: any = null
-    let attempts = 0
-    const maxAttempts = 3
+    // 3. Extraer el monto usando expresiones regulares (busca patrones como 99.99 o Bs. 99.99)
+    const cleanText = recognizedText.replace(/\r?\n/g, ' ')
 
-    while (attempts < maxAttempts) {
-      try {
-        attempts++
-        aiResponse = await ai.models.generateContent({
-          model: 'gemini-3.8-flash',
-          contents: [
-            {
-              role: 'user',
-              parts: [
-                { inlineData: { data: base64Image, mimeType } },
-                { text: prompt },
-              ],
-            },
-          ],
-        })
-        break
-      } catch (aiError: any) {
-        console.error(
-          `Intento ${attempts} fallido en Gemini API:`,
-          aiError.message,
+    // Buscamos números grandes o decimales que representen el monto
+    const amountRegex = /(?:bs\.?|monto|suma)?\s*[:]?\s*([0-9]+[.,][0-9]{2})/gi
+    const matches = [...cleanText.matchAll(amountRegex)]
+
+    let extractedAmount = 0
+    if (matches.length > 0) {
+      // Tomamos el último o el valor más lógico encontrado, o convertimos el primer match
+      extractedAmount = parseFloat(
+        matches[matches.length - 1][1].replace(',', '.'),
+      )
+    } else {
+      // Fallhorback buscando cualquier número con decimales en el texto si la regex estricta falla
+      const fallbackNumbers = cleanText.match(/\b\d+[\.,]\d{2}\b/g)
+      if (fallbackNumbers && fallbackNumbers.length > 0) {
+        extractedAmount = parseFloat(
+          fallbackNumbers[fallbackNumbers.length - 1].replace(',', '.'),
         )
-        if (attempts >= maxAttempts) {
-          console.error(
-            'ERROR CRITICO EN GEMINI API (Agotados los reintentos):',
-            aiError,
-          )
-          throw new AppError(
-            `Error comunicándose con la IA: ${aiError.message || 'Desconocido'}`,
-            503,
-          )
-        }
-        await new Promise((resolve) => setTimeout(resolve, 2000))
       }
     }
 
-    const rawText = aiResponse.text || '{}'
-    const cleanJson = rawText
-      .replace(/```json/g, '')
-      .replace(/```/g, '')
-      .trim()
+    const extractedReference = cleanText
 
-    let extractedData
-    try {
-      extractedData = JSON.parse(cleanJson)
-    } catch (error) {
+    // 4. Validar Monto
+    if (!extractedAmount || extractedAmount < Number(order.totalPrice)) {
       throw new AppError(
-        'La IA no pudo procesar el comprobante correctamente por baja legibilidad.',
+        `Pago rechazado: El monto detectado (Bs. ${extractedAmount}) es menor al total de la orden (Bs. ${order.totalPrice}).`,
         400,
       )
     }
 
-    const extractedAmount = Number(extractedData.monto)
-    const extractedReference = extractedData.referencia || ''
-
-    if (extractedAmount < Number(order.totalPrice)) {
-      throw new AppError(
-        `Pago rechazado: El monto pagado (Bs. ${extractedAmount}) es menor al total de la orden (Bs. ${order.totalPrice}).`,
-        400,
-      )
-    }
-
+    // 5. Validar Referencia / Glosa
     const expectedGloss = order.transactionId || `Pago Orden #${order.id}`
     const cleanExpected = expectedGloss.toLowerCase().replace(/\s+/g, '')
     const cleanExtracted = extractedReference.toLowerCase().replace(/\s+/g, '')
 
-    if (
-      !cleanExtracted.includes(cleanExpected) &&
-      !cleanExpected.includes(cleanExtracted)
-    ) {
+    if (!cleanExtracted.includes(cleanExpected)) {
       throw new AppError(
-        `Pago rechazado: La referencia no coincide. Esperada: '${expectedGloss}', Encontrada: '${extractedReference}'.`,
+        `Pago rechazado: La referencia o número de orden no coincide en el comprobante.`,
         400,
       )
     }
 
+    // 6. Consolidar el pago
     await prisma.receipt.create({
       data: {
         orderId: id,
