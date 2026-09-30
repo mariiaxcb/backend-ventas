@@ -34,6 +34,7 @@ interface PostulantePayload {
 }
 
 const PRODUCTOS_TTL_MS = 2000
+const RESERVA_TIMEOUT_MS = 180000 // 3 minutos
 
 function calcularLimite(stock: number): number {
   if (stock <= 0) return 0
@@ -50,7 +51,8 @@ export class TikTokLiveConnectorService {
 
   private productos: ProductoEnOferta[] = []
   private productosCargadosEn: number = 0
-  private reservadosPorProducto: Map<number, Set<string>> = new Map()
+  // Map<productId, Map<usuarioTiktok, timestamp>>
+  private reservadosPorProducto: Map<number, Map<string, number>> = new Map()
 
   public async conectarLive(
     uniqueId: string,
@@ -168,13 +170,31 @@ export class TikTokLiveConnectorService {
     const limite = calcularLimite(producto.stock)
     if (limite === 0) return
 
-    const reservados =
-      this.reservadosPorProducto.get(producto.id) ?? new Set<string>()
-    if (reservados.has(usuario)) return
-    if (reservados.size >= limite) return
+    const ahora = Date.now()
+    const reservas = this.reservadosPorProducto.get(producto.id) ?? new Map<string, number>()
 
-    reservados.add(usuario)
-    this.reservadosPorProducto.set(producto.id, reservados)
+    // Limpiar reservas expiradas (más de 3 minutos)
+    for (const [user, timestamp] of reservas.entries()) {
+      if (ahora - timestamp > RESERVA_TIMEOUT_MS) {
+        reservas.delete(user)
+      }
+    }
+
+    // Verificar si el usuario ya tiene una reserva activa
+    if (reservas.has(usuario)) {
+      const timestamp = reservas.get(usuario)!
+      if (ahora - timestamp <= RESERVA_TIMEOUT_MS) {
+        return // La reserva aún es válida
+      }
+      // La reserva expiró, se elimina arriba y se permite una nueva
+    }
+
+    // Verificar si hay cupo disponible
+    if (reservas.size >= limite) return
+
+    // Crear nueva reserva
+    reservas.set(usuario, ahora)
+    this.reservadosPorProducto.set(producto.id, reservas)
 
     const payload: PostulantePayload = {
       usuarioTiktok: usuario,
@@ -183,7 +203,7 @@ export class TikTokLiveConnectorService {
       productoNombre: producto.name,
       comentario,
       timestamp: ventaDetectada.fecha,
-      reservados: reservados.size,
+      reservados: reservas.size,
       limite,
       stock: producto.stock,
     }
@@ -195,7 +215,7 @@ export class TikTokLiveConnectorService {
     }
 
     logger.info(
-      `🎯 [RESERVA ${reservados.size}/${limite}] @${usuario} -> ${producto.code} "${comentario}"`,
+      `🎯 [RESERVA ${reservas.size}/${limite}] @${usuario} -> ${producto.code} "${comentario}"`,
     )
 
     try {
@@ -238,14 +258,19 @@ export class TikTokLiveConnectorService {
 
     const reservas = await prisma.reservation.findMany({
       where: { streamId: this.streamId },
-      select: { productId: true, tiktokUsername: true },
+      select: { productId: true, tiktokUsername: true, timestamp: true },
     })
 
+    const ahora = Date.now()
     for (const reserva of reservas) {
-      const set =
-        this.reservadosPorProducto.get(reserva.productId) ?? new Set<string>()
-      set.add(reserva.tiktokUsername)
-      this.reservadosPorProducto.set(reserva.productId, set)
+      // Solo cargar reservas que no han expirado (menos de 3 minutos)
+      const timestamp = new Date(reserva.timestamp).getTime()
+      if (ahora - timestamp > RESERVA_TIMEOUT_MS) continue
+
+      const map =
+        this.reservadosPorProducto.get(reserva.productId) ?? new Map<string, number>()
+      map.set(reserva.tiktokUsername, timestamp)
+      this.reservadosPorProducto.set(reserva.productId, map)
     }
   }
 

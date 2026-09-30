@@ -4,6 +4,7 @@ import { OrderStatus, StreamStatus, MovementType } from '@prisma/client'
 import { canelaBankService } from '@/services/canela-bank.service'
 import { inventoryService } from './inventory.service'
 import { v2 as cloudinary } from 'cloudinary'
+import { getIO } from '@/websockets/socket.server'
 
 import { createWorker } from 'tesseract.js'
 
@@ -103,6 +104,12 @@ export const orderService = {
           tiktokUsername: tiktokUsername?.trim(),
         },
       })
+    } else if (tiktokUsername) {
+      // Actualizar tiktokUsername siempre que se proporcione uno nuevo
+      buyer = await prisma.buyer.update({
+        where: { id: buyer.id },
+        data: { tiktokUsername: tiktokUsername.trim() },
+      })
     }
 
     const productIds = items.map((i) => i.productId)
@@ -171,13 +178,21 @@ export const orderService = {
       }
     }
 
+    // Emitir evento de nuevo pedido
+    try {
+      const io = getIO()
+      io.emit('pedido:nuevo', { pedido: order })
+    } catch (error) {
+      console.error('Error emitiendo evento pedido:nuevo:', error)
+    }
+
     return order
   },
 
   updateStatus: async (id: number, status: OrderStatus) => {
     await orderService.getById(id)
 
-    return prisma.order.update({
+    const updatedOrder = await prisma.order.update({
       where: { id },
       data: { status },
       include: {
@@ -187,6 +202,26 @@ export const orderService = {
         receipt: true,
       },
     })
+
+    // Emitir evento de pedido actualizado
+    try {
+      const io = getIO()
+      io.emit('pedido:actualizado', { pedido: updatedOrder })
+
+      // Si el pago fue validado, avisar al bot para que notifique al cliente
+      if (status === OrderStatus.PAID) {
+        io.emit('pago:validado', {
+          pedidoId: updatedOrder.id,
+          whatsapp: updatedOrder.buyer?.whatsapp,
+          nombreCliente: updatedOrder.buyer?.clientName,
+          tiktokUsername: updatedOrder.buyer?.tiktokUsername,
+        })
+      }
+    } catch (error) {
+      console.error('Error emitiendo evento pedido:actualizado:', error)
+    }
+
+    return updatedOrder
   },
 
   generateQr: async (id: number) => {
@@ -196,7 +231,10 @@ export const orderService = {
       throw new AppError('Order is already paid', 400)
     }
 
-    const expectedGloss = `Pago Orden #${order.id} - ${order.buyer.clientName}`
+    // Formato: #orden - codigo producto - @usuario tiktok
+    const productCode = order.orderItems[0]?.product?.code || 'N/A'
+    const usuarioTiktok = order.buyer?.tiktokUsername || order.buyer?.clientName || 'cliente'
+    const expectedGloss = `#${order.id} - ${productCode} - @${usuarioTiktok}`
 
     const qrResponse = await canelaBankService.generateQr({
       amount: Number(order.totalPrice),
@@ -298,18 +336,27 @@ export const orderService = {
       }
     }
 
-    const nameMatch = recognizedText.match(
-      /originante[:\s]+([A-Za-zÁÉÍÓÚáéíóúÑñ\s_-]+?)(?=\s+Se debit|Fecha|Hora|$)/i,
-    )
-    let extractedName = ''
-    if (nameMatch && nameMatch[1]) {
-      extractedName = nameMatch[1]
-        .replace(/\r?\n/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim()
-    }
+    // Extraer referencia del comprobante.
+    // El OCR suele leer mal el simbolo # (por ejemplo "#37" como "437"), asi que
+    // se valida contra varias alternativas: el numero de orden o el codigo
+    // del producto, que unico por pedido.
+    const productCode = order.orderItems[0]?.product?.code || ''
 
-    const extractedReference = cleanText
+    const orderIdPatterns = [
+      /#\s*(\d+)/i,
+      /referencia[:\s]*(\d+)/i,
+      productCode
+        ? new RegExp(`${productCode}[\\s\\-–—]*@?\\s*(\\d+)`, 'i')
+        : null,
+    ].filter(Boolean) as RegExp[]
+
+    const extractedOrderId =
+      orderIdPatterns
+        .map((pattern) => cleanText.match(pattern)?.[1])
+        .find(Boolean) ?? null
+
+    const productCodeFound =
+      productCode && cleanText.toLowerCase().includes(productCode.toLowerCase())
 
     if (!extractedAmount || extractedAmount < Number(order.totalPrice)) {
       throw new AppError(
@@ -318,49 +365,57 @@ export const orderService = {
       )
     }
 
-    const expectedGloss = order.transactionId || `Pago Orden #${order.id}`
-    const cleanExpected = expectedGloss.toLowerCase().replace(/\s+/g, '')
-    const cleanExtracted = extractedReference.toLowerCase().replace(/\s+/g, '')
+    const orderIdValid = extractedOrderId === order.id.toString()
 
-    if (!cleanExtracted.includes(cleanExpected)) {
+    if (!orderIdValid && !productCodeFound) {
       throw new AppError(
         `Pago rechazado: La referencia o número de orden no coincide en el comprobante.`,
         400,
       )
     }
 
-    if (extractedName && order.buyerId) {
-      await prisma.buyer.update({
-        where: { id: order.buyerId },
-        data: { clientName: extractedName },
-      })
-    }
+    // El OCR SOLO verifica informacion del comprobante (monto + referencia).
+    // No debe modificar la identidad del comprador: el texto reconocido suele
+    // venir corrupto (ej. "aues") y terminaba corrompiendo el nombre real.
+    // Para notificar al cliente se usa buyer.tiktokUsername.
 
-    await prisma.receipt.create({
+    const receipt = await prisma.receipt.create({
       data: {
         orderId: id,
         imageUrl: receiptUrl,
         extractedAmount: extractedAmount,
-        validationStatus: 'VALIDATED',
+        validationStatus: 'PENDING',
       },
     })
 
-    for (const item of order.orderItems) {
-      await inventoryService.registerMovement({
-        productId: item.productId,
-        quantity: item.quantity,
-        movementType: MovementType.OUT,
-      })
-    }
-
-    return prisma.order.update({
+    // NO marcar como PAID - el vendedor debe validar manualmente
+    // Solo actualizar a IN_REVIEW para indicar que está pendiente de validación
+    const updatedOrder = await prisma.order.update({
       where: { id },
-      data: { status: OrderStatus.PAID },
+      data: { status: OrderStatus.IN_REVIEW },
       include: {
         buyer: true,
         orderItems: { include: { product: true } },
         receipt: true,
       },
     })
+
+    // Emitir evento de comprobante recibido para notificar al vendedor
+    try {
+      const io = getIO()
+      io.emit('comprobante:recibido', {
+        pedido: updatedOrder,
+        comprobante: {
+          id: receipt.id,
+          imageUrl: receipt.imageUrl,
+          extractedAmount: receipt.extractedAmount,
+          validationStatus: receipt.validationStatus,
+        },
+      })
+    } catch (error) {
+      console.error('Error emitiendo evento comprobante:recibido:', error)
+    }
+
+    return updatedOrder
   },
 }
