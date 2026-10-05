@@ -1,8 +1,12 @@
-import { prisma } from '@/config/database'
+﻿import { prisma } from '@/config/database'
 import { AppError } from '@/middlewares/error.middleware'
 import { OrderStatus, StreamStatus, MovementType } from '@prisma/client'
 import { canelaBankService } from '@/services/canela-bank.service'
 import { inventoryService } from './inventory.service'
+import {
+  extractReceiptData,
+  validateReceipt,
+} from './receipt-validation.service'
 import { v2 as cloudinary } from 'cloudinary'
 import { getIO } from '@/websockets/socket.server'
 
@@ -190,7 +194,16 @@ export const orderService = {
   },
 
   updateStatus: async (id: number, status: OrderStatus) => {
-    await orderService.getById(id)
+    const previousOrder = await orderService.getById(id)
+
+    // El stock se descuenta cuando el pago queda confirmado, no cuando el OCR
+    // pasa la revisión: hasta que el vendedor no confirma, la unidad sigue
+    // disponible. La comprobación sobre el estado previo mantiene el descuento
+    // única vez aunque el webhook del banco y el vendedor validen la misma orden.
+    const yaEstabaCobrada =
+      previousOrder.status === OrderStatus.PAID ||
+      previousOrder.status === OrderStatus.DELIVERED
+    const confirmaPago = status === OrderStatus.PAID && !yaEstabaCobrada
 
     const updatedOrder = await prisma.order.update({
       where: { id },
@@ -203,7 +216,10 @@ export const orderService = {
       },
     })
 
-    // Emitir evento de pedido actualizado
+    // Avisamos antes de tocar el inventario: el pago ya está confirmado y el
+    // cliente debe enterarse pase lo que pase. El descuento de stock es un
+    // efecto secundario y no puede impedir la notificación, ni dejar un
+    // pedido pagado sin avisar (por ejemplo si el stock se agotó).
     try {
       const io = getIO()
       io.emit('pedido:actualizado', { pedido: updatedOrder })
@@ -219,6 +235,35 @@ export const orderService = {
       }
     } catch (error) {
       console.error('Error emitiendo evento pedido:actualizado:', error)
+    }
+
+    if (confirmaPago) {
+      try {
+        for (const item of updatedOrder.orderItems) {
+          await inventoryService.registerMovement({
+            productId: item.productId,
+            quantity: item.quantity,
+            movementType: MovementType.OUT,
+          })
+        }
+
+        await prisma.receipt.updateMany({
+          where: { orderId: id },
+          data: { validationStatus: 'VALIDATED' },
+        })
+      } catch (error: any) {
+        // El pago ya está confirmado: solo queda regularizar el inventario,
+        // y queda registrado en el log para corregirlo a mano.
+        console.error(
+          `Pedido #${id} pagado pero sin actualizar el inventario:`,
+          error?.message || error,
+        )
+      }
+    } else if (status === OrderStatus.REJECTED) {
+      await prisma.receipt.updateMany({
+        where: { orderId: id },
+        data: { validationStatus: 'REJECTED' },
+      })
     }
 
     return updatedOrder
@@ -317,62 +362,22 @@ export const orderService = {
       await worker.terminate()
     }
 
-    const cleanText = recognizedText.replace(/\r?\n/g, ' ')
+    // El OCR solo extrae datos del comprobante. Toda la validacion vive en
+    // receipt-validation.service: monto, referencia exacta del pedido y fecha
+    // de la transaccion dentro de la ventana valida.
+    const receiptData = extractReceiptData(recognizedText)
 
-    const amountRegex = /(?:bs\.?|monto|suma)?\s*[:]?\s*([0-9]+[.,][0-9]{2})/gi
-    const matches = [...cleanText.matchAll(amountRegex)]
+    const expectedProductCode = order.orderItems[0]?.product?.code || ""
+    const expectedTiktokUsername = order.buyer?.tiktokUsername || ""
 
-    let extractedAmount = 0
-    if (matches.length > 0) {
-      extractedAmount = parseFloat(
-        matches[matches.length - 1][1].replace(',', '.'),
-      )
-    } else {
-      const fallbackNumbers = cleanText.match(/\b\d+[\.,]\d{2}\b/g)
-      if (fallbackNumbers && fallbackNumbers.length > 0) {
-        extractedAmount = parseFloat(
-          fallbackNumbers[fallbackNumbers.length - 1].replace(',', '.'),
-        )
-      }
-    }
+    validateReceipt(receiptData, {
+      id: order.id,
+      totalPrice: order.totalPrice,
+      createdAt: order.createdAt,
+      productCode: expectedProductCode,
+      tiktokUsername: expectedTiktokUsername,
+    })
 
-    // Extraer referencia del comprobante.
-    // El OCR suele leer mal el simbolo # (por ejemplo "#37" como "437"), asi que
-    // se valida contra varias alternativas: el numero de orden o el codigo
-    // del producto, que unico por pedido.
-    const productCode = order.orderItems[0]?.product?.code || ''
-
-    const orderIdPatterns = [
-      /#\s*(\d+)/i,
-      /referencia[:\s]*(\d+)/i,
-      productCode
-        ? new RegExp(`${productCode}[\\s\\-–—]*@?\\s*(\\d+)`, 'i')
-        : null,
-    ].filter(Boolean) as RegExp[]
-
-    const extractedOrderId =
-      orderIdPatterns
-        .map((pattern) => cleanText.match(pattern)?.[1])
-        .find(Boolean) ?? null
-
-    const productCodeFound =
-      productCode && cleanText.toLowerCase().includes(productCode.toLowerCase())
-
-    if (!extractedAmount || extractedAmount < Number(order.totalPrice)) {
-      throw new AppError(
-        `Pago rechazado: El monto detectado (Bs. ${extractedAmount}) es menor al total de la orden (Bs. ${order.totalPrice}).`,
-        400,
-      )
-    }
-
-    const orderIdValid = extractedOrderId === order.id.toString()
-
-    if (!orderIdValid && !productCodeFound) {
-      throw new AppError(
-        `Pago rechazado: La referencia o número de orden no coincide en el comprobante.`,
-        400,
-      )
-    }
 
     // El OCR SOLO verifica informacion del comprobante (monto + referencia).
     // No debe modificar la identidad del comprador: el texto reconocido suele
@@ -383,7 +388,7 @@ export const orderService = {
       data: {
         orderId: id,
         imageUrl: receiptUrl,
-        extractedAmount: extractedAmount,
+        extractedAmount: receiptData.amount,
         validationStatus: 'PENDING',
       },
     })

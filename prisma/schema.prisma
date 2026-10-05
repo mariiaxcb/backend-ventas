@@ -129,6 +129,7 @@ model Order {
   status        OrderStatus @default(PENDING)
   qrId          String?     @db.VarChar(100)
   transactionId String?     @db.VarChar(100)
+  createdAt     DateTime    @default(now())
   buyerId       Int
   buyer         Buyer       @relation(fields: [buyerId], references: [id])
   streamId      Int
