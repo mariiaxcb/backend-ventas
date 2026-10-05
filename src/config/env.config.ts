@@ -41,6 +41,11 @@ const envSchema = z.object({
     .string()
     .min(1, 'CANELA_WEBHOOK_SECRET es requerido'),
   APP_BASE_URL: z.string().min(1, 'APP_BASE_URL es requerido'),
+
+  /** Minutos que un comprador tiene para confirmar su reserva en WhatsApp. */
+  RESERVATION_TTL_MINUTES: z.coerce.number().int().positive().default(3),
+  /** Cada cuántos segundos se buscan reservas vencidas para cancelarlas. */
+  RESERVATION_SWEEP_INTERVAL_SECONDS: z.coerce.number().int().positive().default(20),
 })
 
 const parsed = envSchema.safeParse(process.env)

@@ -15,6 +15,7 @@ import { swaggerSpec } from '@/config/swagger.config'
 
 import './queues/ocr.queue'
 import './queues/whatsapp.queue'
+import { iniciarSweepReservas } from '@/jobs/reservation.expiry.job'
 
 const app = express()
 const server = http.createServer(app)
@@ -43,6 +44,7 @@ async function bootstrap() {
   server.listen(env.PORT, () => {
     logger.info(`🚀 Servidor escuchando en el puerto ${env.PORT}`)
   })
+  iniciarSweepReservas()
 }
 
 bootstrap().catch((error) => {

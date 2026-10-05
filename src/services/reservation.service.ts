@@ -1,4 +1,5 @@
 import { prisma } from '@/config/database'
+import { env } from '@/config/env.config'
 import { AppError } from '@/middlewares/error.middleware'
 import { StreamStatus } from '@prisma/client'
 
@@ -7,6 +8,15 @@ export interface CreateReservationInput {
   productCode: string
   timestamp: string | Date
   comment?: string
+}
+
+/** Reserva vencida por falta de confirmación del comprador. */
+export interface ReservationExpirada {
+  id: number
+  tiktokUsername: string
+  productCode: string
+  productName: string
+  streamId: number
 }
 
 export const reservationService = {
@@ -70,5 +80,45 @@ export const reservationService = {
       },
       orderBy: { timestamp: 'asc' },
     })
+  },
+
+  /**
+   * Cancela las reservas PENDING que el comprador no confirmó a tiempo en
+   * WhatsApp y devuelve las canceladas.
+   *
+   * Solo se vencen las reservas de transmisiones en vivo: al terminar el live
+   * las reservas sin confirmar dejan de tener sentido y se conservan tal cual
+   * para el historial.
+   */
+  expireStale: async (): Promise<ReservationExpirada[]> => {
+    const ttlMs = env.RESERVATION_TTL_MINUTES * 60 * 1000
+    const vencidoEn = new Date(Date.now() - ttlMs)
+
+    const vencidas = await prisma.reservation.findMany({
+      where: {
+        status: 'PENDING',
+        timestamp: { lt: vencidoEn },
+        stream: { status: StreamStatus.LIVE },
+      },
+      include: { product: { select: { name: true } } },
+    })
+
+    if (vencidas.length === 0) return []
+
+    // Actualizamos por id para no volver a tocar las que otro proceso cambió.
+    const canceladas = await prisma.reservation.updateMany({
+      where: { id: { in: vencidas.map((r) => r.id) }, status: 'PENDING' },
+      data: { status: 'CANCELLED' },
+    })
+
+    if (canceladas.count === 0) return []
+
+    return vencidas.map((reserva) => ({
+      id: reserva.id,
+      tiktokUsername: reserva.tiktokUsername,
+      productCode: reserva.productCode,
+      productName: reserva.product.name,
+      streamId: reserva.streamId,
+    }))
   },
 }
