@@ -57,6 +57,75 @@ const ETIQUETAS_POSTERIORES =
 const MAX_LINEAS_CONTINUACION = 3
 
 /**
+ * Cuántas líneas en blanco se saltan antes de dar la referencia por terminada.
+ *
+ * Los comprobantes del BNB separan cada fila con puntos. Cuando esa fila está
+ * desvanecida y el OCR no la transcribe, en su lugar queda una línea vacía, y
+ * un corte ahí partía el usuario justo por la mitad ("@rash" sin "ad_barra").
+ * Dos líneas vacías seguidas ya no son un separador: son un bloque nuevo.
+ */
+const MAX_LINEAS_VACIAS = 2
+
+/**
+ * Relleno visual de los comprobantes del BNB.
+ *
+ * Las filas están separadas por líneas de puntos. Cuando el valor de una fila
+ * se parte en dos, esa línea de puntos queda en medio del texto y, si se une
+ * tal cual, se cuela dentro del dato: el usuario quedaba como
+ * "rash....................ad_barra".
+ */
+const RE_SOLO_RELLENO = /^[\s.·\-_=*]*$/
+
+/**
+ * Quita el relleno de una línea, dejando solo el contenido.
+ *
+ * Devuelve cadena vacía si la línea era puro relleno, para que el llamador
+ * pueda ignorarla en lugar de romper la lectura de la referencia.
+ *
+ * El "_" y el "-" solo se quitan al principio, nunca al final: son parte de
+ * los datos. Un usuario terminado en "_" ("ad_") es un "_" de datos, y quitarlo
+ * convertiría "rash" + "ad_" + "barra" en "rashadbarra", que no es el mismo
+ * nombre.
+ */
+function quitarRelleno(linea: string): string {
+  return linea.replace(/^[\s.·\-_=*]+/, '').replace(/[\s.·]+$/, '')
+}
+
+/**
+ * Une dos fragmentos de un valor que el OCR partió entre líneas.
+ *
+ * No siempre conviene pegar sin más. Si el fragmento anterior terminó en "_"
+ * (un separador de nombre, como en "@rash" / "ad_barra") y el siguiente empieza
+ * con letras, es un corte dentro de una palabra y se pegan. Pero si terminó en
+ * una letra y el siguiente empieza con letra, puede ser el comienzo de un dato
+ * nuevo: en ese caso se necesita un espacio, o "@rash" + "ad" se volvería
+ * "rashad" cuando el usuario real era "rash" y "ad" el código de otra cosa.
+ */
+function unirFragmentos(anterior: string, siguiente: string): string {
+  if (!anterior) return siguiente
+
+  const previo = anterior.slice(-1)
+
+  // Separador explícito del formato de referencia: siempre se pegan.
+  if (previo === '-' || previo === '@') return anterior + siguiente
+
+  // "ad_" + "barra": el "_" ya es el separador, no hay que duplicarlo.
+  if (previo === '_') return anterior + siguiente
+
+  // "@rash" + "ad_barra": mismo dato partido a mitad de palabra.
+  if (siguiente.startsWith('_')) return anterior + siguiente
+
+  // "@rash" + "ad": corte dentro de la palabra.
+  if (/[A-Za-z0-9]$/.test(anterior) && /^[a-z]/.test(siguiente)) {
+    return anterior + siguiente
+  }
+
+  // Cualquier otro corte (por ejemplo tras "mio123" hacia un código) lleva
+  // espacio, porque son datos distintos.
+  return `${anterior} ${siguiente}`
+}
+
+/**
  * Extrae la referencia del comprobante, aunque el banco la parta en varias
  * líneas.
  *
@@ -82,23 +151,41 @@ function extractReferenceLine(rawText: string): string | null {
     /^\s*referencia\s*:?\s*/i,
     '',
   )
-  const partes: string[] = [primeraParte]
+  let acumulado = primeraParte.trim()
+  let contadorContinuacion = 0
+  let lineasVacias = 0
 
   for (let i = indiceInicio + 1; i < lineas.length; i++) {
-    if (partes.length > MAX_LINEAS_CONTINUACION) break
+    if (contadorContinuacion >= MAX_LINEAS_CONTINUACION) break
 
     const linea = lineas[i]
 
-    // Línea vacía: el OCR corta los bloques con saltos en blanco.
-    if (!linea.trim()) break
+    // Una línea en blanco aquí es casi siempre el separador entre filas que el
+    // OCR no leyó, no el final del campo. Se salta y se sigue buscando la
+    // continuación; si se acumulan varias, ya es otro bloque.
+    if (!linea.trim()) {
+      lineasVacias += 1
+      if (lineasVacias > MAX_LINEAS_VACIAS) break
+      continue
+    }
+
+    lineasVacias = 0
 
     // Empezó otro campo del comprobante, la referencia ya terminó.
     if (ETIQUETAS_POSTERIORES.test(linea)) break
 
-    partes.push(linea.trim())
+    const contenido = quitarRelleno(linea)
+
+    // Línea de puro relleno (los puntos que separan las filas del BNB): no es
+    // contenido, pero tampoco corta la referencia. Si el valor se partió justo
+    // ahí, la continuación viene en la línea siguiente.
+    if (!contenido) continue
+
+    contadorContinuacion += 1
+    acumulado = unirFragmentos(acumulado, contenido)
   }
 
-  return partes.join('').trim() || null
+  return acumulado.trim() || null
 }
 
 function parseReferenceParts(

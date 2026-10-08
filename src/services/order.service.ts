@@ -233,6 +233,18 @@ export const orderService = {
           tiktokUsername: updatedOrder.buyer?.tiktokUsername,
         })
       }
+
+      // El vendedor rechazó el comprobante: el bot le pide al cliente que
+      // verifique. Sin este evento el cliente se queda esperando una
+      // confirmación que nunca llega.
+      if (status === OrderStatus.REJECTED) {
+        io.emit('pago:rechazado', {
+          pedidoId: updatedOrder.id,
+          whatsapp: updatedOrder.buyer?.whatsapp,
+          nombreCliente: updatedOrder.buyer?.clientName,
+          tiktokUsername: updatedOrder.buyer?.tiktokUsername,
+        })
+      }
     } catch (error) {
       console.error('Error emitiendo evento pedido:actualizado:', error)
     }
@@ -366,6 +378,17 @@ export const orderService = {
     // receipt-validation.service: monto, referencia exacta del pedido y fecha
     // de la transaccion dentro de la ventana valida.
     const receiptData = extractReceiptData(recognizedText)
+
+    // El texto reconocido se registra porque el OCR cambia su salida segun la
+    // foto que manda el cliente (resolucion, angulo, si el banco parte una fila
+    // en dos). Sin este log, un fallo de validacion no hay forma de
+    // diagnosticarlo: solo se ve el dato mal leido, no lo que el banco escribio.
+    console.log(
+      `[OCR orden ${id}] texto reconocido:\n${JSON.stringify(recognizedText)}`,
+    )
+    console.log(
+      `[OCR orden ${id}] extraido: referencia=${JSON.stringify(receiptData.reference)} usuario=${JSON.stringify(receiptData.tiktokUsername)} codigo=${JSON.stringify(receiptData.productCode)} monto=${receiptData.amount}`,
+    )
 
     const expectedProductCode = order.orderItems[0]?.product?.code || ""
     const expectedTiktokUsername = order.buyer?.tiktokUsername || ""
