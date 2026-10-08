@@ -3,3 +3,7 @@ dist/
 .env
 *.log
 .DS_Store
+
+# Caché de TypeScript. La regenera `tsc` y cambia en cada compilación.
+tsconfig.tsbuildinfo
+*.bak
