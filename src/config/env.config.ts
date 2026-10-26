@@ -30,6 +30,12 @@ const envSchema = z.object({
 
   FRONTEND_URL: z.string().default('http://localhost:3000'),
 
+  /** SMTP para el envio de correos (por ejemplo, Gmail). */
+  SMTP_HOST: z.string().default('smtp.gmail.com'),
+  SMTP_PORT: z.coerce.number().int().positive().default(465),
+  SMTP_USER: z.string().default(''),
+  SMTP_PASS: z.string().default(''),
+
   BNB_API_BASE_URL: z.string().default('https://api.bnb.com.bo'),
   BNB_API_KEY: z.string().optional(),
   BNB_ACCOUNT_ID: z.string().optional(),
