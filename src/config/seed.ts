@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client'
+﻿import { PrismaClient } from '@prisma/client'
 import bcrypt from 'bcryptjs'
 
 const prisma = new PrismaClient()
@@ -8,9 +8,10 @@ async function main() {
 
   await prisma.admin.upsert({
     where: { username: 'Admin' },
-    update: {},
+    update: { email: 'mariiaxcb@gmail.com' },
     create: {
       username: 'Admin',
+      email: 'mariiaxcb@gmail.com',
       password: hashedPassword,
       status: 'ACTIVE',
     },
