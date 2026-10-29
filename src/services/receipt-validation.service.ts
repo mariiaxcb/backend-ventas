@@ -29,6 +29,33 @@ function normalizar(texto: string): string {
   return texto.toLowerCase().replace(/\s+/g, ' ').trim()
 }
 
+/**
+ * Normaliza un código alfanumérico aplicando sustituciones comunes de OCR.
+ *
+ * El OCR confunde frecuentemente caracteres visualmente similares:
+ *  - O (letra o)  <-> 0 (cero)
+ *  - I (letra i)  <-> 1 (uno)  <-> L (letra ele)
+ *  - S (letra ese)<-> 5 (cinco)
+ *  - B (letra be) <-> 8 (ocho)
+ *  - Z (letra zeta)<-> 2 (dos)
+ *  - G (letra ge) <-> 6 (seis)
+ *
+ * Convierte todos los caracteres confusos a una forma canonica, de modo que
+ * "MIO321", "MI10321", "M10321" y "MIO32l" se normalicen igual y puedan
+ * compararse sin falsos negativos. No hardcodea ningun valor: es aplicable a
+ * cualquier codigo de producto o texto alfanumerico.
+ */
+function normalizarCodigoOCR(codigo: string): string {
+  return codigo
+    .toUpperCase()
+    .replace(/[O]/g, '0')
+    .replace(/[IL]/g, '1')
+    .replace(/[S]/g, '5')
+    .replace(/[B]/g, '8')
+    .replace(/[Z]/g, '2')
+    .replace(/[G]/g, '6')
+}
+
 /** Extrae el monto: prioriza la etiqueta "suma de Bs." del comprobando bancario. */
 function extractAmount(rawText: string): number | null {
   const patrones = [
@@ -308,7 +335,8 @@ export function validateReceipt(
 
   if (
     receipt.productCode &&
-    normalizar(receipt.productCode) !== normalizar(order.productCode)
+    normalizarCodigoOCR(receipt.productCode) !==
+      normalizarCodigoOCR(order.productCode)
   ) {
     throw new AppError(
       `El comprobante menciona el producto "${receipt.productCode}" y no "${order.productCode}".`,
