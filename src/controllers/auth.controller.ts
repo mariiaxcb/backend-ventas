@@ -112,6 +112,80 @@ export const authController = {
   },
 
   /**
+   * Devuelve el perfil del admin autenticado, incluyendo su usuario de TikTok.
+   */
+  async getProfile(req: Request, res: Response, next: NextFunction) {
+    try {
+      const adminId = Number((req as any).usuario?.id)
+      if (!adminId) throw new AppError('Token invalido', 401)
+
+      const admin = await prisma.admin.findUnique({
+        where: { id: adminId },
+        select: {
+          id: true,
+          username: true,
+          email: true,
+          status: true,
+          tiktokUsername: true,
+        },
+      })
+
+      if (!admin) throw new AppError('Usuario no encontrado', 404)
+
+      return sendSuccess(res, admin, 'Perfil obtenido correctamente')
+    } catch (error) {
+      next(error)
+    }
+  },
+
+  /**
+   * Actualiza el usuario de TikTok del negocio. Se usa para definir una sola
+   * vez el usuario con el que se realizan los lives.
+   */
+  async updateProfile(req: Request, res: Response, next: NextFunction) {
+    try {
+      const adminId = Number((req as any).usuario?.id)
+      if (!adminId) throw new AppError('Token invalido', 401)
+
+      const schema = z.object({
+        tiktokUsername: z
+          .string()
+          .trim()
+          .max(24, 'El usuario de TikTok no puede superar 24 caracteres')
+          .regex(
+            /^[A-Za-z0-9._]{2,24}$/,
+            'El usuario de TikTok solo puede tener letras, numeros, punto y guion bajo',
+          )
+          .optional()
+          .or(z.literal('')),
+      })
+
+      const { tiktokUsername } = schema.parse(req.body)
+
+      const value =
+        !tiktokUsername || tiktokUsername.trim() === ''
+          ? null
+          : tiktokUsername.trim().replace(/^@/, '')
+
+      const updated = await prisma.admin.update({
+        where: { id: adminId },
+        data: { tiktokUsername: value },
+        select: {
+          id: true,
+          username: true,
+          email: true,
+          status: true,
+          tiktokUsername: true,
+        },
+      })
+
+      return sendSuccess(res, updated, 'Perfil actualizado correctamente')
+    } catch (error) {
+      next(error)
+    }
+  },
+
+  /**
    * Cambia la contrasena usando el token de recuperacion.
    *
    * El token es un JWT firmado con prop `purpose: 'reset_password'`, de 1 hora

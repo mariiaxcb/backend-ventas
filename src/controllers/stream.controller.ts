@@ -1,12 +1,14 @@
 // src/controllers/stream.controller.ts
 import type { Request, Response, NextFunction } from 'express'
 import { z } from 'zod'
+import { prisma } from '@/config/database'
 import { streamService } from '@/services/stream.service'
+import { tikTokLiveService } from '@/services/tiktok.service'
+import { AppError } from '@/middlewares/error.middleware'
 import { sendSuccess } from '@/utils/response.util'
 
 const createStreamSchema = z.object({
   title: z.string().min(1, 'Title is required'),
-  tiktokUsername: z.string().min(1, 'TikTok Username is required'),
 })
 
 const manageProductSchema = z.object({
@@ -44,17 +46,63 @@ export const streamController = {
   },
 
   async create(req: Request, res: Response, next: NextFunction) {
+    let streamId: number | null = null
+    const io = req.app.get('io')
+    let adminTiktokUsername: string | null = null
+
     try {
-      const { title, tiktokUsername } = createStreamSchema.parse(req.body)
+      const { title } = createStreamSchema.parse(req.body)
       const adminId = Number((req as any).usuario.id)
+
+      // El usuario de TikTok se define una sola vez en el Perfil del negocio.
+      // Si no esta configurado, no se puede iniciar el live.
+      const admin = await prisma.admin.findUnique({
+        where: { id: adminId },
+        select: { tiktokUsername: true },
+      })
+
+      adminTiktokUsername = admin?.tiktokUsername ?? null
+
+      if (!adminTiktokUsername) {
+        throw new AppError(
+          'Debes configurar tu usuario de TikTok en la seccion Perfil antes de iniciar un live.',
+          400,
+        )
+      }
+
+      const tiktokUsername = adminTiktokUsername
+
       const stream = await streamService.create({
-        title,
+        title: title.trim(),
         tiktokUsername,
         adminId,
       })
+      streamId = stream.id
+
+      await tikTokLiveService.conectarLive(tiktokUsername, stream.id, io)
+
       return sendSuccess(res, stream, 'Live stream started successfully', 201)
-    } catch (error) {
-      next(error)
+    } catch (error: any) {
+      console.error('Error al iniciar monitoreo de TikTok:', error)
+
+      if (streamId !== null) {
+        try {
+          await streamService.endStream(streamId)
+        } catch (endError) {
+          console.error('No se pudo cerrar el stream tras el error:', endError)
+        }
+      }
+
+      // Mensaje claro cuando el usuario de TikTok no esta en vivo.
+      const mensaje = error?.message || 'No se pudo conectar al Live de TikTok'
+      const noEstaEnVivo =
+        /not live|offline|user.*not.*live|room.*not.*found|connect/i.test(mensaje)
+
+      return res.status(400).json({
+        error: noEstaEnVivo
+          ? `El usuario @${adminTiktokUsername ?? ''} no esta en vivo en este momento. Verifica que estes transmitiendo en TikTok.`
+          : mensaje,
+      })
     }
   },
 

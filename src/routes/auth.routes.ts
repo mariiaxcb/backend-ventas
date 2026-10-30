@@ -1,5 +1,6 @@
 import { Router } from 'express'
 import { authController } from '@/controllers/auth.controller'
+import { verificarToken } from '@/middlewares/auth.middleware'
 
 const router = Router()
 
@@ -97,5 +98,8 @@ router.post('/forgot-password', authController.forgotPassword)
  *         description: Token invalido, expirado o contrasena debil
  */
 router.post('/reset-password', authController.resetPassword)
+
+router.get('/profile', verificarToken, authController.getProfile)
+router.put('/profile', verificarToken, authController.updateProfile)
 
 export default router
