@@ -56,6 +56,53 @@ function normalizarCodigoOCR(codigo: string): string {
     .replace(/[G]/g, '6')
 }
 
+/**
+ * Distancia de Levenshtein: cuántas inserciones, borrados o sustituciones
+ * separan dos cadenas. Se usa para tolerar el error típico del OCR, que a
+ * veces duplica o inventa un carácter ("MIO321" leído como "MI10321").
+ */
+function distanciaLevenshtein(a: string, b: string): number {
+  if (a === b) return 0
+  if (!a.length) return b.length
+  if (!b.length) return a.length
+
+  let anterior = Array.from({ length: b.length + 1 }, (_, i) => i)
+
+  for (let i = 1; i <= a.length; i++) {
+    const actual = [i]
+    for (let j = 1; j <= b.length; j++) {
+      const costo = a[i - 1] === b[j - 1] ? 0 : 1
+      actual[j] = Math.min(
+        anterior[j] + 1,
+        actual[j - 1] + 1,
+        anterior[j - 1] + costo,
+      )
+    }
+    anterior = actual
+  }
+
+  return anterior[b.length]
+}
+
+/**
+ * Compara el código leído por OCR con el del pedido tolerando el error del
+ * motor de reconocimiento, que suele duplicar, omitir o confundir un
+ * carácter ("MIO321" leído como "MI10321"). No hardcodea ningún valor: el
+ * margen es proporcional a la longitud del código.
+ *
+ * Con margen 0 la comparación es exacta; con 1 se tolera un error suelto;
+ * con 2, dos, solo en códigos de 6 caracteres o más.
+ */
+export function codigosCoinciden(leido: string, esperado: string): boolean {
+  const a = normalizarCodigoOCR(leido)
+  const b = normalizarCodigoOCR(esperado)
+
+  if (a === b) return true
+
+  const margen = Math.max(a.length, b.length) >= 6 ? 2 : 1
+  return distanciaLevenshtein(a, b) <= margen
+}
+
 /** Extrae el monto: prioriza la etiqueta "suma de Bs." del comprobando bancario. */
 function extractAmount(rawText: string): number | null {
   const patrones = [
@@ -335,8 +382,7 @@ export function validateReceipt(
 
   if (
     receipt.productCode &&
-    normalizarCodigoOCR(receipt.productCode) !==
-      normalizarCodigoOCR(order.productCode)
+    !codigosCoinciden(receipt.productCode, order.productCode)
   ) {
     throw new AppError(
       `El comprobante menciona el producto "${receipt.productCode}" y no "${order.productCode}".`,
