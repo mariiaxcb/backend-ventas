@@ -40,6 +40,23 @@ export const reservationService = {
       throw new AppError('Product not found with given code', 404)
     }
 
+    // Verificar stock: contar reservas PENDING ya registradas para este
+    // producto en el stream activo. Si ya se alcanzó el stock, rechazar.
+    const reservasPendientes = await prisma.reservation.count({
+      where: {
+        streamId: activeStream.id,
+        productId: product.id,
+        status: 'PENDING',
+      },
+    })
+
+    if (reservasPendientes >= product.stock) {
+      throw new AppError(
+        `No hay stock disponible para el producto ${product.code} (stock: ${product.stock}, reservas pendientes: ${reservasPendientes})`,
+        400,
+      )
+    }
+
     return prisma.reservation.create({
       data: {
         tiktokUsername: data.tiktokUsername.trim(),

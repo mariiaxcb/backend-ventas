@@ -38,7 +38,6 @@ const RESERVA_TIMEOUT_MS = 180000 // 3 minutos
 
 function calcularLimite(stock: number): number {
   if (stock <= 0) return 0
-  if (stock === 1) return 3
   return stock
 }
 
@@ -79,6 +78,8 @@ export class TikTokLiveConnectorService {
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       this.tiktokLiveConnection.on('chat', (data: any) => {
+        const comment = data.comment || data.commentText || data.content || ''
+        console.log(`[TIKTOK CHAT] @${data.uniqueId || '?'}: "${comment}"`)
         void this.procesarComentario(data)
       })
 
@@ -107,7 +108,7 @@ export class TikTokLiveConnectorService {
     }
   }
 
-  private async procesarComentario(data: any): Promise<void> {
+  public async procesarComentario(data: any): Promise<void> {
     const nicknameCrudo: string =
       data.nickname || data.userDetails?.nickname || data.user?.nickname || ''
 
@@ -143,10 +144,21 @@ export class TikTokLiveConnectorService {
 
     await this.cargarProductos(false)
 
-    const comentarioLower = comentario.toLowerCase()
+    const comentarioLower = comentario.toLowerCase().trim()
+    // TikTok a veces filtra comentarios que son solo un codigo de producto.
+    // Por eso se busca el codigo tanto tal cual como sin espacios, para capturar
+    // "mio123", "mio 123" o "quiero mio123".
+    const comentarioSinEspacios = comentarioLower.replace(/\s+/g, '')
     const producto = [...this.productos]
       .sort((a, b) => b.code.length - a.code.length)
-      .find((p) => comentarioLower.includes(p.code.toLowerCase()))
+      .find((p) => {
+        const codigo = p.code.toLowerCase()
+        const codigoSinEspacios = codigo.replace(/\s+/g, '')
+        return (
+          comentarioLower.includes(codigo) ||
+          comentarioSinEspacios.includes(codigoSinEspacios)
+        )
+      })
 
     if (!producto) return
 
@@ -189,8 +201,25 @@ export class TikTokLiveConnectorService {
       // La reserva expiró, se elimina arriba y se permite una nueva
     }
 
-    // Verificar si hay cupo disponible
+    // Verificar si hay cupo disponible en memoria
     if (reservas.size >= limite) return
+
+    // Verificar contra la BD: contar reservas PENDING para este producto en el stream activo.
+    // Esto protege contra reinicios del live que pierdan el mapa en memoria.
+    const reservasPendientesBD = await prisma.reservation.count({
+      where: {
+        streamId: this.streamId!,
+        productId: producto.id,
+        status: 'PENDING',
+      },
+    })
+
+    if (reservasPendientesBD >= producto.stock) {
+      // No hay stock disponible en BD, limpiar este usuario de la memoria y rechazar
+      reservas.delete(usuario)
+      this.reservadosPorProducto.set(producto.id, reservas)
+      return
+    }
 
     // Crear nueva reserva
     reservas.set(usuario, ahora)
