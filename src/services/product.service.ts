@@ -126,10 +126,21 @@ export const productService = {
     })
   },
 
+  /**
+   * Desactiva un producto (baja lógica).
+   *
+   * No se borra la fila: las órdenes, reservas, historial de inventario y
+   * streams la referencian, así que un DELETE físico falla por clave foránea
+   * (P2003) y, si llegara a ejecutarse, rompería el historial de ventas.
+   * El endpoint DELETE se conserva por compatibilidad, pero su efecto es
+   * marcar el producto como INACTIVE para ocultarlo del catálogo.
+   */
   delete: async (id: number) => {
     await productService.getById(id)
-    return prisma.product.delete({
+    return prisma.product.update({
       where: { id },
+      data: { status: ProductStatus.INACTIVE },
+      include: { category: true },
     })
   },
 

@@ -162,7 +162,7 @@ router.get('/check-code', productController.checkCode)
  *       200:
  *         description: Producto actualizado exitosamente
  *   delete:
- *     summary: Eliminar un producto
+ *     summary: Desactivar un producto (baja lógica, status INACTIVE)
  *     tags:
  *       - Products
  *     parameters:
@@ -173,7 +173,7 @@ router.get('/check-code', productController.checkCode)
  *           type: integer
  *     responses:
  *       200:
- *         description: Producto eliminado exitosamente
+ *         description: Producto desactivado exitosamente
  */
 router.get('/:id', productController.getById)
 router.put('/:id', upload.single('image'), productController.update)
